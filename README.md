@@ -43,6 +43,14 @@ pip install django pyodbc opencv-python numpy faiss-cpu insightface
 python manage.py collectstatic
 ```
 
+在 `.\CRCFiles\settings.py` 里写入自己的httpsURL
+
+```bash
+CSRF_TRUSTED_ORIGINS = [
+    'https://myhost.com',
+]
+```
+
 ### 2. 项目目录说明
 
 - `manage.py` - Django 启动入口
@@ -72,6 +80,8 @@ run_server.bat
 ```
 http://127.0.0.1:8000/
 ```
+
+请在生产环境中使用nginx反向代理https，并使用waitress运行本项目（使用 `pip install waitress` 安装waitress库之后，使用 `waitress_runserver.bat` 运行项目）
 
 ## 系统操作方法
 

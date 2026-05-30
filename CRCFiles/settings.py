@@ -18,6 +18,22 @@ DEBUG = False
 
 ALLOWED_HOSTS = ["*"]
 
+# Trusted origins for CSRF when serving the site via HTTPS or a proxy.
+# Add your external domain and port used by the browser (scheme + host[:port]).
+# Example: https://ftcdstudio.com:4500
+CSRF_TRUSTED_ORIGINS = [
+    '',
+]
+
+# When the site is served behind a reverse proxy that terminates TLS, enable
+# the following so Django knows the original request was secure. Adjust header
+# name if your proxy uses a different one (most use X-Forwarded-Proto).
+#SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+
+# If you're serving over HTTPS, consider enabling secure cookies:
+#SESSION_COOKIE_SECURE = True
+#CSRF_COOKIE_SECURE = True
+
 # Application definition
 
 INSTALLED_APPS = [
