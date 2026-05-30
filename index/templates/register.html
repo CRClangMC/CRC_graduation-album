@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>注册新用户</title>
+    <style>
+        body { margin: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f8fafc; color: #0f172a; display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+        .box { width: 420px; padding: 32px; background: #ffffff; border-radius: 24px; box-shadow: 0 20px 50px rgba(15, 23, 42, 0.12); }
+        h1 { margin-top: 0; }
+        form { display: grid; gap: 16px; }
+        label { display: block; color: #475569; font-weight: 600; }
+        input { width: 100%; padding: 12px 14px; border: 1px solid #cbd5e1; border-radius: 12px; font-size: 1rem; }
+        button { border: none; border-radius: 999px; padding: 12px 16px; background: #2563eb; color: #ffffff; cursor: pointer; font-weight: 700; }
+        .footer { font-size: 0.95rem; color: #64748b; }
+        .footer a { color: #2563eb; text-decoration: none; }
+        .message { color: #ef4444; }
+    </style>
+</head>
+<body>
+    <div class="box">
+        <h1>注册新用户</h1>
+        <form method="POST" action="{% url 'index:register' %}">
+            {% csrf_token %}
+            <label>用户名</label>
+            <input name="username" required maxlength="150" />
+            <label>密码</label>
+            <input name="password" type="password" required minlength="6" />
+            <label>确认密码</label>
+            <input name="confirm_password" type="password" required minlength="6" />
+            <button type="submit">注册</button>
+            <div class="message">{{ message }}</div>
+        </form>
+        <div class="footer">已有账号？<a href="{% url 'index:login' %}">前往登录</a></div>
+    </div>
+</body>
+</html>

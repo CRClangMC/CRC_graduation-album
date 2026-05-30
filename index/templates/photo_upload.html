@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>照片上传</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f8fafc; color: #0f172a; margin: 0; }
+        .container { max-width: 900px; margin: 0 auto; padding: 32px 20px; }
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
+        .header a { color: #2563eb; text-decoration: none; }
+        .box { background: #ffffff; border-radius: 24px; box-shadow: 0 20px 40px rgba(15, 23, 42, 0.08); padding: 28px; }
+        .box h1 { margin-top: 0; }
+        .preview { margin-top: 20px; display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
+        .preview-item { border: 1px solid #e2e8f0; border-radius: 16px; overflow: hidden; position: relative; }
+        .preview-item img { width: 100%; display: block; }
+        .preview-item p { margin: 0; padding: 10px; font-size: 0.95rem; color: #475569; }
+        .actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 18px; }
+        button { border: none; border-radius: 999px; padding: 12px 24px; cursor: pointer; background: #2563eb; color: #ffffff; font-weight: 600; }
+        .progress-bar { width: 100%; height: 12px; background: #e2e8f0; border-radius: 999px; overflow: hidden; margin-top: 16px; display: none; }
+        .bar { width: 0; height: 100%; background: #2563eb; transition: width 0.2s ease; }
+        #status { margin-top: 16px; color: #334155; }
+        @media (max-width: 768px) {
+            .container { padding: 22px 14px; }
+            .header { flex-direction: column; align-items: flex-start; gap: 14px; }
+            .actions { flex-direction: column; }
+            button { width: 100%; }
+            input[type=file] { width: 100%; }
+            .preview { grid-template-columns: 1fr; }
+            .preview-item p { font-size: 0.95rem; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div>
+                <h1>照片上传</h1>
+                <p>上传毕业照后，系统会自动提取人脸特征并写入相册数据库。</p>
+            </div>
+            <a href="{% url 'index:home' %}">返回首页</a>
+        </div>
+        <div class="box">
+            <form id="uploadForm" enctype="multipart/form-data" method="POST">
+                {% csrf_token %}
+                <div>
+                    <input type="file" id="photoInput" name="photos" accept="image/*" multiple required />
+                </div>
+                <div class="actions">
+                    <button type="button" id="uploadButton">开始上传</button>
+                </div>
+            </form>
+            <div class="progress-bar" id="progressBar"><div class="bar" id="uploadProgress"></div></div>
+            <div id="status">请选择照片后点击上传。</div>
+            <div class="preview" id="preview"></div>
+        </div>
+    </div>
+    <script>
+        const photoInput = document.getElementById('photoInput');
+        const preview = document.getElementById('preview');
+        const status = document.getElementById('status');
+        const uploadButton = document.getElementById('uploadButton');
+
+        photoInput.addEventListener('change', () => {
+            preview.innerHTML = '';
+            Array.from(photoInput.files).forEach(file => {
+                const reader = new FileReader();
+                reader.onload = () => {
+                    const item = document.createElement('div');
+                    item.className = 'preview-item';
+                    item.innerHTML = `<img src="${reader.result}" alt="${file.name}"><p>${file.name}</p>`;
+                    preview.appendChild(item);
+                };
+                reader.readAsDataURL(file);
+            });
+        });
+
+        const progressBar = document.getElementById('progressBar');
+        const uploadProgress = document.getElementById('uploadProgress');
+
+        uploadButton.addEventListener('click', () => {
+            const files = Array.from(photoInput.files);
+            if (files.length === 0) {
+                alert('请选择至少一张照片。');
+                return;
+            }
+            status.textContent = '正在上传照片，请稍候...';
+            progressBar.style.display = 'block';
+            uploadProgress.style.width = '0%';
+
+            const formData = new FormData();
+            files.forEach(file => formData.append('photos', file));
+
+            const xhr = new XMLHttpRequest();
+            xhr.open('POST', "{% url 'index:photo_upload' %}");
+            xhr.setRequestHeader('X-CSRFToken', getCookie('csrftoken'));
+
+            xhr.upload.onprogress = (event) => {
+                if (event.lengthComputable) {
+                    const percent = Math.round((event.loaded / event.total) * 100);
+                    uploadProgress.style.width = percent + '%';
+                    status.textContent = `上传进度：${percent}%`;
+                }
+            };
+
+            xhr.onload = () => {
+                progressBar.style.display = 'none';
+                try {
+                    const data = JSON.parse(xhr.responseText);
+                    if (data.status === 'success') {
+                        status.textContent = '已提交照片，已开始后台特征提取。稍候刷新我的上传页面查看结果。';
+                    } else {
+                        status.textContent = data.message || '上传失败，请重试。';
+                    }
+                } catch (err) {
+                    status.textContent = '上传响应解析失败。';
+                }
+            };
+
+            xhr.onerror = () => {
+                progressBar.style.display = 'none';
+                status.textContent = '上传请求失败，请检查网络。';
+            };
+
+            xhr.send(formData);
+        });
+
+        function getCookie(name) {
+            const value = `; ${document.cookie}`;
+            const parts = value.split(`; ${name}=`);
+            if (parts.length === 2) return parts.pop().split(';').shift();
+            return '';
+        }
+    </script>
+</body>
+</html>

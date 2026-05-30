@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>文件删除</title>
+    <style>
+        body { font-family: Arial, sans-serif; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { padding: 10px; text-align: left; border-bottom: 1px solid #ddd; }
+        th { background-color: #f2f2f2; }
+        button { margin-top: 20px; padding: 10px 20px; background-color: #4CAF50; color: white; border: none; border-radius: 5px; cursor: pointer; }
+        button:hover { background-color: #45a049; }
+    </style>
+    <script>
+        if (window.history.replaceState) {
+            window.history.replaceState(null, null, window.location.href);
+        }
+    </script>
+</head>
+<body>
+    <form method="GET" action="/api/search" style="margin-bottom: 20px;">
+        <input type="text" name="query" placeholder="通过ID、文件名或上传者搜索" value="{{ request.GET.query|default:'' }}" style="padding: 10px; width: 80%; border: 1px solid #ddd; border-radius: 5px;">
+        <button type="submit" style="padding: 10px 20px; background-color: #4CAF50; color: white; border: none; border-radius: 5px; cursor: pointer;">搜索</button>
+    </form>
+    <form method="POST" action="/delete/">
+        {% csrf_token %}
+        <button type="submit">删除选中的文件</button>
+        <button type="button" onclick="location.href='/index/'">文件库</button>
+        <table>
+            <thead>
+                <tr>
+                    <th>选择</th>
+                    <th>文件名</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% if files %}
+                    {% for file in files %}
+                    <tr>
+                        <td><input type="checkbox" name="file_ids" value="{{ file.id }}"></td>
+                        <td>{{ file.name }}</td>
+                    </tr>
+                    {% endfor %}
+                {% else %}
+                    <tr>
+                        <td colspan="2">未找到匹配的文件</td>
+                    </tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </form>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const searchForm = document.querySelector('form[method="GET"]');
+            const tableBody = document.querySelector('table tbody');
+
+            searchForm.addEventListener('submit', function(event) {
+                event.preventDefault(); // 阻止表单默认提交行为
+
+                const query = searchForm.querySelector('input[name="query"]').value;
+
+                fetch(`/api/search?query=${encodeURIComponent(query)}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        tableBody.innerHTML = ''; // 清空表格内容
+
+                        if (data.files && data.files.length > 0) {
+                            data.files.forEach(file => {
+                                const row = document.createElement('tr');
+                                const fileName = file.path.split('/').pop(); // 提取文件名
+                                row.innerHTML = `
+                                    <td><input type="checkbox" name="file_ids" value="${file.id}"></td>
+                                    <td>${fileName}</td>
+                                `;
+                                tableBody.appendChild(row);
+                            });
+                        } else {
+                            const row = document.createElement('tr');
+                            row.innerHTML = '<td colspan="2">未找到匹配的文件</td>';
+                            tableBody.appendChild(row);
+                        }
+                    })
+                    .catch(error => {
+                        console.error('搜索请求失败:', error);
+                    });
+            });
+        });
+    </script>
+</body>
+</html>

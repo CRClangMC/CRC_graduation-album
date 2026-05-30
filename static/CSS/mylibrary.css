@@ -1,0 +1,285 @@
+/**********    所有网页公共的样式     ********************/
+
+/*通过与container的配合，让网页的内容居中*/
+body{ 
+	text-align:center; 
+	 margin: 0;
+	 background-color: gray;
+}
+
+a:link {	
+	text-decoration: none; 	
+	color: #2383bd;
+	font-size: 18px;}
+a:visited {
+	text-decoration: none; 
+	color: #2383bd；
+	font-size: 18px;}
+a:hover {
+	text-decoration: none;
+	color: #263466；
+	font-size: 18px;}
+a:active {
+	color: #2383bd；	
+	font-size: 18px;
+}
+
+table { 
+	border:0;
+	padding: 0;
+	color: #666;
+} 
+table td { 	
+	padding:0px;
+}
+
+/*最外层的容器层样式设置，用于设置将网页内容居中*/
+#container{
+    margin:0 auto; 
+    width:1200px; 
+    height:680px; 
+
+}
+
+/*登录表单样式设置 */
+#content_form{
+    z-index: 100;
+    background-color: #fff;
+    width: 1000px;
+    height: 680px;
+    position: relative;
+    left: 100px;
+    top: 30px;
+    border-radius: 4px;
+    box-shadow:2px 2px 5px #333;
+}
+#banner1{
+	width: 1000px;
+	height: 40px;	
+	background: linear-gradient(to right, #263466, #238abd);
+	color: white;
+	text-align: left;
+}
+#img_logo{
+	display:block; 
+	float: left;
+	vertical-align:bottom;
+	margin-top: 6px;
+	margin-left: 100px;	
+	margin-right: 12px;
+	width: 24px;
+	height: 24px;
+	border-radius: 8px;
+}
+#banner2{
+	width: 1000px;
+	height: 40px;
+	background: linear-gradient(to right, #238abd, #263466);
+	color: white;
+	text-align: left;
+}
+#txt_banner2{	
+	display: block;
+	margin-top: 1px;
+	text-align: left;
+	height: 40px;
+	line-height: 36px;
+	margin-left: 100px;
+	font-size: 30px;
+	/*font-weight: bold;*/
+	color: white;
+}
+#txt_banner3{
+	display: block;
+	float: right;	
+	text-align: right;
+	font-size: 20px;
+	/*font-weight: bold;*/
+	width: 300px;
+}
+#navigator{		
+	width: 1000px;
+	height: 56px;
+	text-align: center;
+	/*background-color: #ccc ;*/
+	border-bottom: 1px solid #ccc;
+}
+#nav{
+	margin-top: 0px;
+	margin-left: 100px;	
+	height: 50px;	
+}
+#li_navigator{
+	margin-top: 10px;
+	float: left;
+	list-style-type: none;
+	width: 150px;
+	text-align: center;
+	border-right: 2px solid #2383bd;
+}
+#copyright{
+	z-index: 100; 
+    background-color: #fff;
+    width: 800px;
+    height: 60px;
+    position: absolute;
+    left: 100px;    
+    bottom: 10px;
+    border-top: 1px solid #ccc;
+    font-size: 12px;
+    color: #333;
+    vertical-align: middle;
+}
+
+#p_copyright{
+	font-size: 12px;
+	color: #333;
+	
+}
+
+/***********    公共样式结束    **********************/
+
+/***************   show.html的样式    ***************/
+#search{	
+	width: 1000px;
+	height: 50px;	
+	text-align: right;
+}
+#sub_search{
+	width: 900px;
+	height: 40px;	
+	margin-top: 16px;	
+	font-size: 16px;
+	line-height: 30px;
+	color: #303030;
+}
+#txtBookName{
+	width: 100px;
+	height: 22px;
+	font-size: 18px;
+}
+#txtTime{
+	width: 100px;
+	height: 22px;
+	font-size: 10px;
+}
+
+#btnFind{
+	height: 32px; 
+	width:80px;
+}
+#btnOrder{
+	height:32px;
+	width:72px;
+}
+
+#table_to_Borrow{
+	width:820px;
+	border-collapse:collapse;
+	margin-left: 80px;
+	font-size: 16px;
+	line-height: 36px;
+	color: #333;
+}
+#td_title{
+	background-color: #eee;
+	width:800px;
+	text-align: left; 
+	font-size: 16px;
+	height: 26px;
+	font-weight: bold;
+}
+
+/***************   show.html样式结束    ***************/
+
+/***************   shownew.html的样式开始    ***************/
+#txtTopNumber{
+	width: 120px;
+	height: 26px;
+}
+
+/***************   shownew.html的样式结束    ***************/
+
+
+
+/***************   showBorrow.html样式开始    ***************/
+
+#txtUserID{
+	width: 100px;
+	height: 26px;
+	font-size: 18px;
+}
+
+#table_Borrow{
+	width:820px;
+	border-collapse:collapse;
+	margin-left: 80px;
+	font-size: 16px;
+	line-height: 36px;
+	color: #333;
+}
+#btnFind{
+	width: 80px;
+}
+
+/***************   showBorrow.html样式结束    ***************/
+
+
+/***************   insertData.html样式开始    ***************/
+#insertinfo{	
+	z-index: 100;
+    background-color: #f5f5f5;
+    width: 662px;
+    height: 436px;
+    position: relative;
+    left: 160px;
+    top: 2px;
+    border-radius: 8px;
+    box-shadow:2px 2px 5px #333;
+}
+#table_stu_in{
+	font-size: 15px;
+	line-height: 36px;
+}
+
+.stu_in{
+	width: 160px;
+	height: 26px;
+	font-size: 22px;
+}
+
+/***************   insertData.html样式结束    ***************/
+
+
+
+#div_title{	
+	display: block;
+	margin-top: 20px;
+    width: 660px;
+    height: 60px;      
+    left: 100px;  
+    border-bottom: 1px solid #ccc;    
+    color: #263466;
+    text-align: center; 
+	line-height: 60px;
+}
+
+.book_in{
+	height: 26px;
+	width:148;px
+	font-size: 20px;
+}
+
+#btnLogin{
+	width: 160px;
+	height: 32px;
+	font-size: 20px;
+	color: #666;
+}
+
+#scrollable-div {
+    height: 200px; /* 设置固定高度 */
+    overflow-y: scroll; /* 显示垂直滚动条 */
+    border: 1px solid black; /* 可选：添加边框以便于查看 */
+  }
+

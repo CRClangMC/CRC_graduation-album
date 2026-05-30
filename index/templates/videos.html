@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>视频库</title>
+    <style>
+        body { margin: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #0f172a; color: #f8fafc; }
+        .container { max-width: 1180px; margin: 0 auto; padding: 32px 20px; }
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
+        .header a { color: #38bdf8; text-decoration: none; }
+        .grid { display: grid; gap: 20px; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
+        .card { background: rgba(15, 23, 42, 0.9); border-radius: 24px; overflow: hidden; border: 1px solid rgba(148, 163, 184, 0.18); }
+        .thumb { width: 100%; height: 200px; display: block; object-fit: cover; background: #000; }
+        .placeholder { width: 100%; height: 200px; display: flex; align-items: center; justify-content: center; background: #1e293b; color: #cbd5e1; font-size: 0.95rem; }
+        .card .meta { padding: 18px; }
+        .card .meta h3 { margin: 0 0 8px; font-size: 1.1rem; }
+        .card .meta p { margin: 0 8px 0; color: #cbd5e1; }
+        .watch-button { margin-top: 12px; display: inline-block; padding: 10px 16px; background: #38bdf8; color: #0f172a; border-radius: 999px; text-decoration: none; font-weight: 700; }
+        .pagination { display: flex; justify-content: center; align-items: center; gap: 16px; margin-top: 24px; padding: 16px 0; }
+        .pagination a { display: inline-block; padding: 10px 18px; border-radius: 999px; background: #38bdf8; color: #0f172a; text-decoration: none; }
+        .pagination span { color: #cbd5e1; }
+        @media (max-width: 768px) {
+            .container { padding: 24px 16px; }
+            .header { flex-direction: column; align-items: flex-start; gap: 12px; }
+            .grid { grid-template-columns: 1fr; }
+            .card .meta { padding: 16px; }
+            .watch-button { width: 100%; text-align: center; }
+            .pagination { flex-direction: column; gap: 12px; align-items: stretch; }
+            .pagination a, .pagination span { width: 100%; text-align: center; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div>
+                <h1>视频库</h1>
+                <p>浏览所有上传到毕业视频库的资源，支持在线播放。</p>
+            </div>
+            <a href="{% url 'index:home' %}">返回首页</a>
+        </div>
+        <div class="grid">
+            {% if videos %}
+                {% for video in videos %}
+                <div class="card">
+                    {% if video.thumbnail_path %}
+                    <img class="thumb" src="{{ video.thumbnail_path }}" alt="{{ video.file_name }}">
+                    {% else %}
+                    <div class="placeholder">未生成缩略图</div>
+                    {% endif %}
+                    <div class="meta">
+                        <h3>{{ video.file_name }}</h3>
+                        <p>上传者：{{ video.creater }}</p>
+                        <p>上传时间：{{ video.created_at }}</p>
+                        <a class="watch-button" href="{{ video.path }}">查看视频</a>
+                    </div>
+                </div>
+                {% endfor %}
+            {% else %}
+                <div class="card"><div class="meta"><p>当前没有可展示的视频。</p></div></div>
+            {% endif %}
+        </div>
+        {% if page_obj and page_obj.paginator.num_pages > 1 %}
+        <div class="pagination">
+            {% if page_obj.has_previous %}
+                <a href="?page={{ page_obj.previous_page_number }}">上一页</a>
+            {% endif %}
+            <span>第 {{ page_obj.number }} / {{ page_obj.paginator.num_pages }} 页</span>
+            {% if page_obj.has_next %}
+                <a href="?page={{ page_obj.next_page_number }}">下一页</a>
+            {% endif %}
+        </div>
+        {% endif %}
+    </div>
+</body>
+</html>

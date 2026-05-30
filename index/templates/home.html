@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>毕业相册</title>
+    <style>
+        body { margin: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); color: #f8fafc; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 40px 20px; }
+        .brand { text-align: center; margin-bottom: 40px; }
+        .brand h1 { font-size: 3rem; margin-bottom: 10px; letter-spacing: 1.2px; }
+        .brand p { font-size: 1.1rem; color: #cbd5e1; }
+        .grid { display: grid; gap: 20px; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+        .card { background: rgba(15, 23, 42, 0.75); border: 1px solid rgba(148, 163, 184, 0.18); border-radius: 20px; padding: 28px; transition: transform .25s ease, box-shadow .25s ease; }
+        .card:hover { transform: translateY(-6px); box-shadow: 0 20px 40px rgba(15, 23, 42, 0.45); }
+        .card h2 { margin: 0 0 16px; font-size: 1.5rem; }
+        .card p { margin: 0 0 24px; line-height: 1.7; color: #cbd5e1; }
+        .card a, .card button { display: inline-block; padding: 12px 20px; border-radius: 999px; border: none; background: #38bdf8; color: #0f172a; text-decoration: none; font-weight: 600; cursor: pointer; }
+        .top-bar { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; margin-bottom: 20px; gap: 12px; }
+        .top-bar .user { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; color: #94a3b8; }
+        .top-bar .user a { color: #38bdf8; background: transparent; padding: 10px 18px; border-radius: 999px; text-decoration: none; font-weight: 600; border: 1px solid rgba(56, 189, 248, 0.7); transition: background .2s ease, color .2s ease; }
+        .top-bar .user a:hover { background: rgba(56, 189, 248, 0.12); color: #ffffff; }
+        .top-bar .user .username { color: #ffffff; border-color: rgba(56, 189, 248, 0.5); }
+        .top-bar .user .username:hover { background: rgba(56, 189, 248, 0.25); }
+        @media (max-width: 768px) {
+            .container { padding: 24px 16px; }
+            .brand h1 { font-size: 2.1rem; }
+            .brand p { font-size: 1rem; }
+            .grid { grid-template-columns: 1fr; }
+            .card { padding: 24px; }
+            .card h2 { font-size: 1.3rem; }
+            .card a, .card button { width: 100%; text-align: center; }
+            .top-bar { flex-direction: column; align-items: flex-start; gap: 12px; }
+            .top-bar a { margin-left: 0; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="top-bar">
+            <div class="user">
+                {% if username %}
+                    <a class="username" href="{% url 'index:login' %}">{{ username }}</a>
+                    <a href="{% url 'index:logout' %}">退出登录</a>
+                {% else %}
+                    <a href="{% url 'index:login' %}">登录</a>
+                    <a href="{% url 'index:register' %}">注册</a>
+                {% endif %}
+            </div>
+        </div>
+        <div class="brand">
+            <h1>毕业相册</h1>
+            <p>校园毕业相册系统 · 人脸识别专属回忆</p>
+        </div>
+        <div class="grid">
+            <div class="card">
+                <h2>个人照片查看</h2>
+                <p>通过人脸识别寻找你的专属毕业照片，自动筛选出含有你的所有回忆。</p>
+                <a href="{% url 'index:face_recognition' %}">立即识别</a>
+            </div>
+            <div class="card">
+                <h2>我的上传</h2>
+                <p>查看你自己上传的所有照片，按时间排序，方便回顾。</p>
+                <a href="{% url 'index:my_uploads' %}">查看我的照片</a>
+            </div>
+            <div class="card">
+                <h2>照片上传</h2>
+                <p>上传毕业照片到相册，系统会自动分类并保存，支持多人合照</p>
+                <a href="{% url 'index:photo_upload' %}">上传照片</a>
+            </div>
+            <div class="card">
+                <h2>视频查看</h2>
+                <p>浏览毕业视频集喵</p>
+                <a href="{% url 'index:videos' %}">查看视频</a>
+            </div>
+            <div class="card">
+                <h2>视频上传</h2>
+                <p>将拍摄的毕业视频上传共享</p>
+                <a href="{% url 'index:upload_video' %}">上传视频</a>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

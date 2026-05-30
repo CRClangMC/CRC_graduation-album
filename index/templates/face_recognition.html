@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>人脸识别专属照片</title>
+    <style>
+        body { margin: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #0f172a; color: #f8fafc; }
+        .container { max-width: 1000px; margin: 0 auto; padding: 30px 20px; }
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
+        .header a { color: #38bdf8; text-decoration: none; }
+        .box { background: rgba(15, 23, 42, 0.9); border-radius: 24px; padding: 24px; }
+        .box h1 { margin-top: 0; }
+        .controls { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; margin-bottom: 18px; }
+        .controls label { display: flex; align-items: center; gap: 8px; font-size: 0.95rem; }
+        .controls button { padding: 12px 20px; border-radius: 999px; border: none; background: #38bdf8; color: #0f172a; cursor: pointer; }
+        video, canvas { width: 100%; max-width: 720px; border-radius: 16px; margin-bottom: 18px; background: #020617; }
+        .gallery { display: grid; gap: 24px; grid-template-columns: repeat(2, minmax(280px, 1fr)); margin-top: 18px; }
+        .photo { border-radius: 18px; overflow: hidden; border: 1px solid rgba(148, 163, 184, 0.18); min-height: 260px; }
+        .photo img { width: 100%; display: block; height: 100%; object-fit: cover; }
+        .message { margin-top: 16px; color: #cbd5e1; }
+        .pagination { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin-top: 18px; }
+        .pagination button { padding: 10px 16px; border: none; border-radius: 999px; background: #38bdf8; color: #0f172a; cursor: pointer; }
+        .pagination button[disabled] { opacity: 0.5; cursor: default; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <form id="csrfTokenForm" style="display:none;">
+            {% csrf_token %}
+        </form>
+        <div class="header">
+            <div>
+                <h1>人脸识别查看专属照片</h1>
+                <p>请开始摄像头并拍摄一张自己的照片，系统将识别你并返回包含你的相册照片，如无法打开摄像头请点击“上传本地照片识别”。</p>
+            </div>
+            <a href="{% url 'index:home' %}">返回首页</a>
+        </div>
+        <div class="box">
+            <div class="controls">
+                    <label><input type="checkbox" id="agreement"> 我已阅读并同意<a href="/static/xy.html" target="_blank">隐私协议</a></label>
+                    <button id="startCamera">开启摄像头</button>
+                <button id="captureButton" disabled>拍照识别</button>
+            </div>
+            <video id="cameraVideo" autoplay muted playsinline></video>
+            <canvas id="captureCanvas" style="display:none;"></canvas>
+            <div class="message" id="message">请允许摄像头权限并点击“拍照识别”。如果摄像头无法打开，可以使用下方按钮上传本地照片识别。</div>
+            <input type="file" id="fileInput" accept="image/*" style="display:none">
+            <div style="margin-top: 8px; display:flex; flex-wrap:wrap; gap:10px;">
+                <button id="uploadPhotoBtn" style="padding: 10px 16px; border-radius: 999px; border: none; background: #38bdf8; color: #0f172a; cursor: pointer;">上传本地照片识别</button>
+                <button id="selectAllBtn" style="display:none; padding: 10px 16px; border-radius: 999px; border: none; background: #22c55e; color: #0f172a; cursor: pointer;">全选当前页</button>
+                <button id="downloadSelectedBtn" disabled style="display:none; padding: 10px 16px; border-radius: 999px; border: none; background: #f59e0b; color: #0f172a; cursor: pointer;">下载选中照片</button>
+            </div>
+            <div class="gallery" id="resultGallery"></div>
+            <div class="pagination" id="paginationControls"></div>
+        </div>
+    </div>
+    <script>
+        const startButton = document.getElementById('startCamera');
+        const captureButton = document.getElementById('captureButton');
+        const agreementCheckbox = document.getElementById('agreement');
+        const videoElement = document.getElementById('cameraVideo');
+        const canvas = document.getElementById('captureCanvas');
+        const messageElement = document.getElementById('message');
+        const resultGallery = document.getElementById('resultGallery');
+        const fileInput = document.getElementById('fileInput');
+        const uploadPhotoBtn = document.getElementById('uploadPhotoBtn');
+        const selectAllBtn = document.getElementById('selectAllBtn');
+        const downloadSelectedBtn = document.getElementById('downloadSelectedBtn');
+        let stream;
+        let selectedPhotoPaths = new Set();
+
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            messageElement.textContent = '当前浏览器无法直接打开摄像头，请使用“上传本地照片识别”。';
+        }
+
+        startButton.addEventListener('click', async () => {
+            if (!agreementCheckbox.checked) {
+                alert('请先同意隐私协议。');
+                return;
+            }
+
+            // 注意：现代浏览器在非 HTTPS 环境可能会阻止摄像头访问，仍会尝试打开并在控制台或 message 中展示错误。
+            console.info('尝试在当前上下文打开摄像头（非 HTTPS 环境可能被浏览器拦截）');
+
+            try {
+                const constraints = { video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false };
+
+                // 兼容旧浏览器：若不存在 navigator.mediaDevices.getUserMedia，则尝试旧版前缀 API
+                if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                    const legacy = navigator.webkitGetUserMedia || navigator.mozGetUserMedia || navigator.getUserMedia;
+                    if (legacy) {
+                        legacy.call(navigator, constraints, s => {
+                            stream = s;
+                            videoElement.srcObject = stream;
+                            videoElement.play().catch(() => {});
+                            captureButton.disabled = false;
+                            messageElement.textContent = '摄像头已开启，点击“拍照识别”。';
+                        }, err => {
+                            console.error('getUserMedia legacy error', err);
+                            messageElement.textContent = '无法打开摄像头，请联系管理员或上传照片识别：' + (err && err.name ? err.name : err.message || err);
+                        });
+                        return;
+                    }
+                    throw new Error('getUserMedia 不可用');
+                }
+
+                // 现代浏览器流程
+                stream = await navigator.mediaDevices.getUserMedia(constraints);
+                videoElement.srcObject = stream;
+                // 确保在 Chrome/Edge 上触发播放
+                await videoElement.play().catch(() => {});
+                captureButton.disabled = false;
+                messageElement.textContent = '摄像头已开启，点击“拍照识别”。';
+            } catch (error) {
+                console.error('Camera open failed:', error);
+                if (error && (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError')) {
+                    messageElement.textContent = '用户拒绝访问摄像头，请检查浏览器权限设置。';
+                } else if (error && (error.name === 'NotFoundError' || error.name === 'DevicesNotFoundError')) {
+                    messageElement.textContent = '未找到可用的摄像头设备。';
+                } else if (error && error.message && error.message.toLowerCase().includes('secure')) {
+                    messageElement.textContent = '请通过 HTTPS 或在 localhost 上访问以启用摄像头。';
+                } else {
+                    messageElement.textContent = '无法打开摄像头，请联系管理员或上传照片识别：' + (error && (error.name || error.message) ? (error.name || error.message) : error);
+                }
+            }
+        });
+
+        let pagedResults = [];
+        let currentPage = 1;
+        const pageSize = 10;
+        const paginationControls = document.getElementById('paginationControls');
+
+        function stopCamera() {
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+                stream = null;
+            }
+            videoElement.srcObject = null;
+            captureButton.disabled = true;
+            startButton.disabled = false;
+        }
+
+        function renderResults(page) {
+            const startIndex = (page - 1) * pageSize;
+            const selected = pagedResults.slice(startIndex, startIndex + pageSize);
+            resultGallery.innerHTML = '';
+            selected.forEach(photo => {
+                const isSelected = selectedPhotoPaths.has(photo.path);
+                const box = document.createElement('div');
+                box.className = 'photo';
+                box.innerHTML = `
+                    <label style="display:block; position:relative;">
+                        <div style="position:absolute; top:10px; left:10px; z-index:2; background:rgba(15,23,42,0.75); border-radius:12px; padding:6px 10px; color:#fff; font-size:0.85rem; display:flex; align-items:center; gap:6px;">
+                            <input type="checkbox" class="photo-checkbox" data-path="${photo.path}" ${isSelected ? 'checked' : ''} style="transform:scale(1.1);">
+                        </div>
+                        <img src="${photo.path}" alt="毕业照片" style="display:block; width:100%; height:auto; border-radius:18px;">
+                    </label>`;
+                resultGallery.appendChild(box);
+            });
+            updateSelectionControls();
+        }
+
+        function updateSelectionControls() {
+            const hasResults = pagedResults.length > 0;
+            selectAllBtn.style.display = hasResults ? 'inline-block' : 'none';
+            downloadSelectedBtn.style.display = hasResults ? 'inline-block' : 'none';
+            const currentPagePhotoCount = pagedResults.slice((currentPage - 1) * pageSize, currentPage * pageSize).length;
+            const currentPageSelectedCount = pagedResults.slice((currentPage - 1) * pageSize, currentPage * pageSize).filter(photo => selectedPhotoPaths.has(photo.path)).length;
+            selectAllBtn.textContent = currentPageSelectedCount === currentPagePhotoCount && currentPagePhotoCount > 0 ? '取消全选当前页' : '全选当前页';
+            downloadSelectedBtn.disabled = selectedPhotoPaths.size === 0;
+        }
+
+        function renderPagination(totalPages) {
+            paginationControls.innerHTML = '';
+            if (totalPages <= 1) {
+                return;
+            }
+            const prev = document.createElement('button');
+            prev.textContent = '上一页';
+            prev.disabled = currentPage === 1;
+            prev.addEventListener('click', () => {
+                if (currentPage > 1) {
+                    currentPage -= 1;
+                    renderResults(currentPage);
+                    renderPagination(totalPages);
+                }
+            });
+            paginationControls.appendChild(prev);
+
+            for (let i = 1; i <= totalPages; i++) {
+                const pageButton = document.createElement('button');
+                pageButton.textContent = i;
+                if (i === currentPage) {
+                    pageButton.disabled = true;
+                }
+                pageButton.addEventListener('click', () => {
+                    currentPage = i;
+                    renderResults(currentPage);
+                    renderPagination(totalPages);
+                });
+                paginationControls.appendChild(pageButton);
+            }
+
+            const next = document.createElement('button');
+            next.textContent = '下一页';
+            next.disabled = currentPage === totalPages;
+            next.addEventListener('click', () => {
+                if (currentPage < totalPages) {
+                    currentPage += 1;
+                    renderResults(currentPage);
+                    renderPagination(totalPages);
+                }
+            });
+            paginationControls.appendChild(next);
+        }
+
+        resultGallery.addEventListener('change', (event) => {
+            const checkbox = event.target;
+            if (!checkbox.classList.contains('photo-checkbox')) {
+                return;
+            }
+            const path = checkbox.dataset.path;
+            if (checkbox.checked) {
+                selectedPhotoPaths.add(path);
+            } else {
+                selectedPhotoPaths.delete(path);
+            }
+            updateSelectionControls();
+        });
+
+        selectAllBtn.addEventListener('click', () => {
+            const pageStart = (currentPage - 1) * pageSize;
+            const pageItems = pagedResults.slice(pageStart, pageStart + pageSize);
+            const allSelected = pageItems.every(photo => selectedPhotoPaths.has(photo.path));
+            pageItems.forEach(photo => {
+                if (allSelected) {
+                    selectedPhotoPaths.delete(photo.path);
+                } else {
+                    selectedPhotoPaths.add(photo.path);
+                }
+            });
+            renderResults(currentPage);
+        });
+
+        downloadSelectedBtn.addEventListener('click', downloadSelectedPhotos);
+
+        async function downloadSelectedPhotos() {
+            if (selectedPhotoPaths.size === 0) {
+                messageElement.textContent = '请先选择要下载的照片。';
+                return;
+            }
+            messageElement.textContent = `正在开始下载 ${selectedPhotoPaths.size} 张照片，请耐心等待...`;
+            const paths = Array.from(selectedPhotoPaths);
+            for (const path of paths) {
+                try {
+                    const response = await fetch(path, { credentials: 'same-origin' });
+                    if (!response.ok) {
+                        console.error('下载失败：', path, response.status);
+                        continue;
+                    }
+                    const blob = await response.blob();
+                    const url = URL.createObjectURL(blob);
+                    const link = document.createElement('a');
+                    link.href = url;
+                    link.download = path.split('/').pop() || 'photo.jpg';
+                    document.body.appendChild(link);
+                    link.click();
+                    link.remove();
+                    URL.revokeObjectURL(url);
+                    await new Promise(resolve => setTimeout(resolve, 200));
+                } catch (err) {
+                    console.error('下载过程出错：', err);
+                }
+            }
+            messageElement.textContent = `已发起 ${paths.length} 张照片下载。`;
+        }
+
+        captureButton.addEventListener('click', async () => {
+            if (!agreementCheckbox.checked) {
+                messageElement.textContent = '请先同意隐私协议后再拍照识别。';
+                return;
+            }
+            if (!stream) {
+                messageElement.textContent = '请先开启摄像头。';
+                return;
+            }
+            canvas.width = videoElement.videoWidth;
+            canvas.height = videoElement.videoHeight;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
+            const dataUrl = canvas.toDataURL('image/jpeg');
+            messageElement.textContent = '正在识别，请稍候...';
+            captureButton.disabled = true;
+
+            try {
+                const response = await fetch("{% url 'index:recognize_face' %}", {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCookie('csrftoken') },
+                    body: JSON.stringify({ image_data: dataUrl })
+                });
+                let data;
+                const text = await response.text();
+                try {
+                    data = JSON.parse(text);
+                } catch (parseError) {
+                    console.error('非 JSON 响应', text);
+                    throw new Error('服务器返回非 JSON 响应，请检查后端或 CSRF 失败。');
+                }
+                if (data.status === 'success') {
+                    if (data.photos.length === 0) {
+                        messageElement.textContent = '未识别到匹配照片，请更换姿势或重试。';
+                        resultGallery.innerHTML = '';
+                        paginationControls.innerHTML = '';
+                    } else {
+                        pagedResults = data.photos;
+                        currentPage = 1;
+                        const totalPages = Math.ceil(pagedResults.length / pageSize);
+                        messageElement.textContent = `找到 ${pagedResults.length} 张匹配照片`;
+                        renderResults(currentPage);
+                        renderPagination(totalPages);
+                    }
+                } else {
+                    messageElement.textContent = data.message || '识别失败，请稍后重试。';
+                }
+            } catch (error) {
+                messageElement.textContent = '识别请求失败，请检查网络。';
+            } finally {
+                stopCamera();
+                captureButton.disabled = false;
+            }
+        });
+
+        uploadPhotoBtn.addEventListener('click', () => {
+            if (!agreementCheckbox.checked) {
+                alert('请先同意隐私协议后再上传本地照片识别。');
+                return;
+            }
+            fileInput.click();
+        });
+
+        fileInput.addEventListener('change', async (e) => {
+            const file = e.target.files && e.target.files[0];
+            if (!file) {
+                return;
+            }
+            if (!agreementCheckbox.checked) {
+                messageElement.textContent = '请先同意隐私协议后再上传本地照片识别。';
+                fileInput.value = '';
+                return;
+            }
+            uploadPhotoBtn.disabled = true;
+            messageElement.textContent = '正在读取本地图片并识别，请稍候...';
+            try {
+                const reader = new FileReader();
+                reader.onload = async function(ev) {
+                    try {
+                        const normalizedDataUrl = await normalizeImageDataUrl(ev.target.result);
+                        const response = await fetch("{% url 'index:recognize_face' %}", {
+                            method: 'POST',
+                            credentials: 'same-origin',
+                            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCookie('csrftoken') },
+                            body: JSON.stringify({ image_data: normalizedDataUrl })
+                        });
+                        let data;
+                        const text = await response.text();
+                        try {
+                            data = JSON.parse(text);
+                        } catch (parseError) {
+                            console.error('非 JSON 响应', text);
+                            throw new Error('服务器返回非 JSON 响应，请检查后端或 CSRF 失败。');
+                        }
+                        if (data.status === 'success') {
+                            if (data.photos.length === 0) {
+                                messageElement.textContent = '未识别到匹配照片。';
+                                resultGallery.innerHTML = '';
+                                paginationControls.innerHTML = '';
+                            } else {
+                                pagedResults = data.photos;
+                                currentPage = 1;
+                                const totalPages = Math.ceil(pagedResults.length / pageSize);
+                                messageElement.textContent = `找到 ${pagedResults.length} 张匹配照片`;
+                                renderResults(currentPage);
+                                renderPagination(totalPages);
+                            }
+                        } else {
+                            messageElement.textContent = data.message || '识别失败，请稍后重试。';
+                        }
+                    } catch (err) {
+                        console.error('Local upload recognize error', err);
+                        messageElement.textContent = err.message || '识别请求失败，请检查网络。';
+                    } finally {
+                        uploadPhotoBtn.disabled = false;
+                        fileInput.value = '';
+                    }
+                };
+                reader.readAsDataURL(file);
+            } catch (err) {
+                console.error(err);
+                messageElement.textContent = '读取文件失败。';
+                uploadPhotoBtn.disabled = false;
+            }
+        });
+
+        function normalizeImageDataUrl(dataUrl) {
+            return new Promise((resolve, reject) => {
+                const image = new Image();
+                image.crossOrigin = 'anonymous';
+                image.onload = () => {
+                    const maxWidth = 1280;
+                    const scale = Math.min(1, maxWidth / image.naturalWidth);
+                    canvas.width = Math.round(image.naturalWidth * scale);
+                    canvas.height = Math.round(image.naturalHeight * scale);
+                    const ctx = canvas.getContext('2d');
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                    ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+                    resolve(canvas.toDataURL('image/jpeg', 0.92));
+                };
+                image.onerror = () => reject(new Error('无法解析本地图片，请选择 JPG/PNG 格式文件。'));
+                image.src = dataUrl;
+            });
+        }
+
+        function getCookie(name) {
+            const value = `; ${document.cookie}`;
+            const parts = value.split(`; ${name}=`);
+            if (parts.length === 2) return parts.pop().split(';').shift();
+            return '';
+        }
+    </script>
+</body>
+</html>

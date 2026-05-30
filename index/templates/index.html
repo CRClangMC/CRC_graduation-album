@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>文件库</title>
+    <style>
+        body { font-family: Arial, sans-serif; }
+        #file-container { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
+        .file-item { width: 200px; text-align: center; border: 1px solid #ccc; padding: 10px; border-radius: 5px; }
+        img, video, audio { width: 100%; height: auto; }
+        .loading { text-align: center; margin: 20px 0; }
+        #pagination { text-align: center; margin: 20px 0; }
+        #pagination button { margin: 0 5px; padding: 5px 10px; }
+        audio {
+            height: 30px; /* 设置音频控件的高度 */
+        }
+        @media (max-width: 768px) {
+            body { font-size: 14px; }
+            #file-container { flex-direction: column; gap: 5px; }
+            .file-item { width: 100%; }
+            #pagination button { padding: 5px; font-size: 12px; }
+            audio { height: 25px; }
+        }
+        @media (min-width: 769px) {
+            body { font-size: 16px; }
+            #file-container { flex-wrap: wrap; gap: 10px; }
+            .file-item { width: 200px; }
+            #pagination button { padding: 5px 10px; font-size: 14px; }
+        }
+    </style>
+</head>
+<body>
+    <h1>文件库</h1>
+    <div>
+        <button onclick="location.href='/upload/'">上传</button>
+        <button onclick="location.href='/delete/'">编辑</button>
+    </div>
+    <div>
+        <input type="text" id="search-input" placeholder="搜索文件ID、文件名或上传者">
+        <button onclick="searchFiles()">搜索</button>
+    </div>
+    <form id="csrf-form">
+        {% csrf_token %}
+    </form>
+    <div id="file-container">
+        <!-- 文件内容将通过 JavaScript 动态加载 -->
+    </div>
+    <div class="loading" id="loading">加载中...</div>
+    <div id="pagination">
+        <!-- 分页导航将通过 JavaScript 动态生成 -->
+    </div>
+    <script>
+        let currentPage = 1;
+        const fileContainer = document.getElementById('file-container');
+        const loadingIndicator = document.getElementById('loading');
+        const paginationContainer = document.getElementById('pagination');
+
+        function renderPagination(currentPage, totalPages) {
+            paginationContainer.innerHTML = '';
+
+            const startPage = Math.max(1, currentPage - 2);
+            const endPage = Math.min(totalPages, currentPage + 2);
+
+            for (let i = startPage; i <= endPage; i++) {
+                const pageButton = document.createElement('button');
+                pageButton.textContent = i;
+                pageButton.disabled = i === currentPage;
+                pageButton.addEventListener('click', () => {
+                    currentPage = i;
+                    fileContainer.innerHTML = '';
+                    loadFiles(currentPage);
+                });
+                paginationContainer.appendChild(pageButton);
+            }
+
+            // 添加输入框和跳转按钮
+            const inputBox = document.createElement('input');
+            inputBox.type = 'number';
+            inputBox.min = 1;
+            inputBox.max = totalPages;
+            inputBox.placeholder = '页码';
+            inputBox.style.marginLeft = '10px';
+            inputBox.style.width = '50px';
+
+            const jumpButton = document.createElement('button');
+            jumpButton.textContent = '跳转';
+            jumpButton.addEventListener('click', () => {
+                const targetPage = parseInt(inputBox.value, 20);
+                if (targetPage >= 1 && targetPage <= totalPages) {
+                    currentPage = targetPage;
+                    fileContainer.innerHTML = '';
+                    loadFiles(currentPage);
+                } else {
+                    alert('请输入有效的页码');
+                }
+            });
+
+            paginationContainer.appendChild(inputBox);
+            paginationContainer.appendChild(jumpButton);
+        }
+
+        async function loadFiles(page) {
+            loadingIndicator.style.display = "block";
+
+            try {
+                const response = await fetch(`/api/files?page=${page}`);
+                const data = await response.json();
+
+                fileContainer.innerHTML = '';
+                data.files.forEach(file => {
+                    const fileItem = document.createElement('div');
+                    fileItem.className = 'file-item';
+
+                    const fileName = file.path.split('/').pop(); // 提取文件名
+                    const displayName = fileName.length > 35 ? fileName.slice(0, 32) + '...' : fileName; // 截断文件名
+                    const fileNameSpan = document.createElement('span');
+                    fileNameSpan.textContent = displayName;
+                    fileNameSpan.style.wordWrap = 'break-word'; // 添加换行样式
+                    fileItem.appendChild(fileNameSpan); // 添加文件名到文件项
+
+                    const uploaderSpan = document.createElement('span');
+                        uploaderSpan.textContent = `上传：${file.uploader}`;
+                        uploaderSpan.style.display = 'block';
+                        fileItem.appendChild(uploaderSpan);
+
+                    if (file.type.toLowerCase() === "image") {
+                        fileItem.innerHTML += `<img src="/${file.md5}" alt="${file.path}">`;
+                    } else if (file.type.toLowerCase() === "video") {
+                        fileItem.innerHTML += `<video src="/${file.md5}" controls></video>`;
+                    } else if (file.type && file.type.toLowerCase() === "audio") {
+                        const audioElement = document.createElement('audio');
+                        audioElement.src = `/${file.md5}`;
+                        audioElement.controls = true;
+                        audioElement.style.width = '100%'; // 确保音频控件宽度适配
+                        fileItem.appendChild(audioElement);
+                    } else {
+                        
+                    }
+
+                    fileItem.innerHTML += `<a href="/${file.md5}" download>下载</a>`;
+                    fileContainer.appendChild(fileItem);
+                });
+
+                renderPagination(data.current_page, data.total_pages);
+
+                if (data.files.length < 20) { // 修改单页显示文件数为20
+                    loadingIndicator.textContent = "没有更多文件了";
+                } else {
+                    loadingIndicator.style.display = "none";
+                }
+            } catch (error) {
+                console.error("加载文件失败:", error);
+                loadingIndicator.textContent = "加载失败，请重试";
+            }
+        }
+
+        // 移除滚轮翻页的事件监听器
+        window.removeEventListener('scroll', () => {
+            if (window.innerHeight + window.scrollY >= document.body.offsetHeight - 100) {
+                loadFiles(++currentPage);
+            }
+        });
+
+        // 初始加载第一页
+        loadFiles(currentPage);
+
+        async function refreshFiles() {
+            currentPage = 1; // 重置当前页码
+            fileContainer.innerHTML = ''; // 清空文件容器
+            await loadFiles(currentPage); // 重新加载第一页
+        }
+
+        // 上传文件后刷新文件列表
+        document.addEventListener('fileUploaded', refreshFiles);
+
+        async function searchFiles() {
+            const query = document.getElementById('search-input').value;
+            if (!query) {
+                alert('请输入搜索内容');
+                return;
+            }
+
+            loadingIndicator.style.display = "block";
+
+            const xhr = new XMLHttpRequest();
+            xhr.open('GET', `/api/search?query=${encodeURIComponent(query)}`, true);
+            xhr.responseType = 'json';
+
+            xhr.onload = function () {
+                if (xhr.status === 200) {
+                    const data = xhr.response;
+
+                    fileContainer.innerHTML = '';
+                    data.files.forEach(file => {
+                        const fileItem = document.createElement('div');
+                        fileItem.className = 'file-item';
+
+                        const fileName = file.name.split('/').pop();
+                        const displayName = fileName.length > 35 ? fileName.slice(0, 32) + '...' : fileName;
+                        const fileNameSpan = document.createElement('span');
+                        fileNameSpan.textContent = displayName;
+                        fileNameSpan.style.wordWrap = 'break-word';
+                        fileItem.appendChild(fileNameSpan);
+
+                        const uploaderSpan = document.createElement('span');
+                        uploaderSpan.textContent = `上传：${file.uploader}`;
+                        uploaderSpan.style.display = 'block';
+                        fileItem.appendChild(uploaderSpan);
+
+                        if (file.type.toLowerCase() === "image") {
+                            fileItem.innerHTML += `<img src="/${file.path}" alt="${file.path}">`;
+                        } else if (file.type.toLowerCase() === "video") {
+                            fileItem.innerHTML += `<video src="/${file.path}" controls></video>`;
+                        } else if (file.type && file.type.toLowerCase() === "audio") {
+                            const audioElement = document.createElement('audio');
+                            audioElement.src = `/${file.path}`;
+                            audioElement.controls = true;
+                            audioElement.style.width = '100%';
+                            fileItem.appendChild(audioElement);
+                        }
+
+                        fileItem.innerHTML += `<a href="/${file.path}" download>下载</a>`;
+                        fileContainer.appendChild(fileItem);
+                    });
+
+                    loadingIndicator.style.display = "none";
+                } else {
+                    console.error("搜索文件失败:", xhr.statusText);
+                    loadingIndicator.textContent = "搜索失败，请重试";
+                }
+            };
+
+            xhr.onerror = function () {
+                console.error("搜索文件失败:", xhr.statusText);
+                loadingIndicator.textContent = "搜索失败，请重试";
+            };
+
+            xhr.send();
+        }
+    </script>
+</body>
+</html>

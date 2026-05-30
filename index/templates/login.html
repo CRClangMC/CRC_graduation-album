@@ -1,0 +1,48 @@
+﻿<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>登录 · 毕业相册</title>
+  <style>
+    :root{ --bg:#0b1220; --card:#0f172a; --accent:#38bdf8; --muted:#94a3b8 }
+    *{box-sizing:border-box}
+    body{ margin:0; font-family:Inter, 'Segoe UI', Tahoma, Verdana, sans-serif; background:linear-gradient(180deg,#051024,#0b1220); color:#e6eef8; display:flex; align-items:center; justify-content:center; min-height:100vh }
+    .card{ width:100%; max-width:420px; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.04); padding:28px; border-radius:12px; box-shadow:0 12px 30px rgba(2,6,23,0.6) }
+    .logo{ text-align:center; margin-bottom:18px }
+    .logo h2{ margin:0; font-size:1.25rem; color:#fff }
+    form{ display:flex; flex-direction:column; gap:12px }
+    label{ font-size:0.95rem; color:var(--muted) }
+    input[type=text], input[type=password]{ width:100%; padding:12px 14px; border-radius:8px; border:1px solid rgba(255,255,255,0.06); background:transparent color:inherit; color:inherit }
+    .hint{ color:#ffb4b4; min-height:20px; font-size:0.95rem }
+    .actions{ display:flex; gap:10px; align-items:center; justify-content:space-between; margin-top:8px }
+    .btn{ padding:10px 16px; border-radius:10px; background:var(--accent); color:#071127; font-weight:700; border:none; cursor:pointer }
+    .links{ text-align:right }
+    .links a{ color:var(--muted); text-decoration:none; font-size:0.9rem }
+    @media (max-width:480px){ .card{ padding:20px; margin:16px } }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="logo">
+      <h2>西宁市第十四中学 · 毕业相册 登录</h2>
+    </div>
+    <form action="{% url 'index:login' %}" method="POST">
+      {% csrf_token %}
+      <div>
+        <label for="txtuser">用户名</label>
+        <input id="txtuser" name="username" type="text" required>
+      </div>
+      <div>
+        <label for="txtpwd">密码</label>
+        <input id="txtpwd" name="password" type="password" required>
+      </div>
+      <div class="hint">{% if warn %}<span style="color:#ff6b6b">{{ warn }}</span>{% endif %}</div>
+      <div class="actions">
+        <div class="links"><a href="{% url 'index:register' %}">注册新账号</a></div>
+        <button type="submit" class="btn">登 录</button>
+      </div>
+    </form>
+  </div>
+</body>
+</html>

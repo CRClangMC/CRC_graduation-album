@@ -1,0 +1,67 @@
+
+<!--  
+/*通过与container的配合，让网页的内容居中*/
+body{ 
+  text-align:center; 
+  margin: 0;
+}
+
+/*最外层的容器层样式设置，用于设置将网页内容居中*/
+#container{
+    margin:0 auto;
+    background-color: #2383BD; 
+    width:1000px; 
+    height:710px; 
+}
+
+/*登录表单样式设置*/
+#content_form{
+    z-index: 100;
+    background-color: #f5f5f5;
+    width: 362px;
+    height: 446px;
+    position: relative;
+    left: 310px;
+    top: 120px;
+    border-radius: 8px;
+    box-shadow:2px 2px 5px #333;
+}
+
+/*第一行欢迎文本样式设置*/
+#P_welcome{
+    color:#263466 ;
+    font-size: 22px; 
+    line-height: 24px;
+    font-weight: bolder;
+
+}
+
+/*文本框上面的标签文本样式设置*/
+#P_label{
+    color: gray ;
+    font-size: 18px;
+    line-height: 18px;
+}
+
+/*文本框内的文本样式设置*/
+.txt_input{
+    width: 200px; 
+    line-height: 36px;
+    font-size: 16px;
+    color: #333;
+  
+}
+
+/*登录按钮的样式设置*/
+.btn_submit{
+    width: 204px;
+    background-color: #1659a8;
+    border:1px solid gray;
+    height: 36px;
+    line-height: 22px;
+    color: white;
+    font-size: 18px;
+}
+
+--> 
+
