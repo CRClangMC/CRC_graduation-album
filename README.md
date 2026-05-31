@@ -25,16 +25,20 @@
   - `faiss-cpu`
   - `insightface`
 
+- 人脸向量提取模型：本项目使用 `insightface` 的 `buffalo_l` 模型，首次运行时会自动下载模型文件到用户目录下的 `~/.insightface/models`。（一般为C:\Users\用户名\.insightface\models）
+  - 如果网络受限，可提前手动下载：
+    ```bash
+    python -c "from insightface.model_zoo import get_model; get_model('buffalo_l', download=True)"
+    ```
+  - 也可直接下载 ZIP 包后解压到模型目录：
+    - ZIP 下载地址：`https://github.com/deepinsight/insightface/releases/download/v0.7/buffalo_l.zip`
+    - 解压到：`~/.insightface/models/buffalo_l/`
+    - 解压后应包含 `.onnx` 模型文件。
+
 使用 `requirements.txt` 安装：
 
 ```bash
 pip install -r requirements.txt
-```
-
-如果你没有 `requirements.txt`，可手动安装：
-
-```bash
-pip install django pyodbc opencv-python numpy faiss-cpu insightface
 ```
 
 之后收集静态文件，使用 `collectstatic.bat` 或执行:
@@ -51,6 +55,67 @@ CSRF_TRUSTED_ORIGINS = [
 ]
 ```
 
+访问nginx官网并下载Windows环境压缩包（https://nginx.org/download/nginx-1.30.2.zip），解压并作为你的nginx目录
+在nginx目录下找到conf文件夹中的`nginx.conf`，按下述进行配置
+
+`nginx.conf`的配置示例及说明
+
+```bash
+worker_processes  1; # Windows下建议设为1
+
+events {
+    worker_connections  1024;
+}
+
+http {
+    include       mime.types;
+    default_type  application/octet-stream;
+    sendfile        on;
+    keepalive_timeout  65;
+    client_max_body_size 200m;
+
+    # --- 配置一：强制跳转 (可选) ---
+    server {
+        listen 80; # http端口
+        server_name myhost.com; # 或者你的域名/IP
+
+        return 301 https://$host$request_uri; #非标准https端口请指定：https://$host:4500$request_uri
+    }
+
+    # --- 配置二：HTTPS 主服务 (核心部分) ---
+    server {
+        # 1. 监听标准端口 443，并开启 SSL
+        listen 443 ssl; # 非标准端口请指定
+        server_name myhost.com; # 或者你的域名/IP
+
+        # 2. 配置你的证书路径 (请确保路径正确，建议使用绝对路径)
+        # 例如：C:/nginx/cert/server.crt
+        ssl_certificate  E:/Download/myhost.com.pem; #示例
+        ssl_certificate_key  E:/Download/myhost.com.key; #示例
+
+        # SSL 性能优化配置
+        ssl_session_cache    shared:SSL:1m;
+        ssl_session_timeout  5m;
+        ssl_protocols TLSv1.2 TLSv1.3;
+        ssl_ciphers HIGH:!aNULL:!MD5;
+        ssl_prefer_server_ciphers on;
+
+        # 3. 反向代理到 Django (8000端口)
+        location / {
+            proxy_pass http://127.0.0.1:8000;
+            proxy_request_buffering off;
+            proxy_buffering off;
+
+            # 传递真实 IP 和协议头 (Django settings.py 中需要配合 SECURE_PROXY_SSL_HEADER 使用)
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+        }
+    }
+}
+```
+
 ### 2. 项目目录说明
 
 - `manage.py` - Django 启动入口
@@ -63,17 +128,35 @@ CSRF_TRUSTED_ORIGINS = [
 
 ### 3. 启动项目
 
-运行以下命令启动开发服务器：
+运行以下命令启动开发服务器（非https，只能上传图片识别，容易内存溢出）：
 
 ```bash
 python manage.py runserver 0.0.0.0:8000
 ```
 
-或在 Windows 下直接运行：
+或在 Windows 下直接运行（非https，只能上传图片识别，容易内存溢出）：
 
 ```bash
 run_server.bat
 ```
+
+请在生产环境中使用 nginx 反向代理 HTTPS，并使用 waitress 运行本项目（使用 `pip install waitress` 安装 waitress 库之后，使用 `waitress_runserver.bat` 运行项目）。
+
+命令示例：
+
+首先启动nginx
+```bash
+cd C:\nginx #你的nginx目录
+start nginx
+```
+
+执行`waitress_runserver.bat` 或使用命令运行项目
+```bash
+waitress-serve --listen=127.0.0.1:8000 --max-request-body-size=200000000 CRCFiles.wsgi:application
+```
+
+- `--max-request-body-size=200000000` 表示允许最大 200MB 请求体，支持大文件上传
+- 如果你需要更高并发，可增加 `--threads=8` 或更多线程
 
 打开浏览器访问：
 
@@ -81,7 +164,12 @@ run_server.bat
 http://127.0.0.1:8000/
 ```
 
-请在生产环境中使用nginx反向代理https，并使用waitress运行本项目（使用 `pip install waitress` 安装waitress库之后，使用 `waitress_runserver.bat` 运行项目）
+- Nginx 配置建议：
+  - `client_max_body_size 200m;` 用于支持大文件上传
+  - `proxy_pass http://127.0.0.1:8000;`
+  - `proxy_request_buffering off;` 和 `proxy_buffering off;` 避免代理缓存大请求导致超时或 413
+  - 传递真实协议头：`proxy_set_header X-Forwarded-Proto $scheme;`
+  示例请参考 `nginx.conf` 中的 HTTPS 代理配置。
 
 ## 系统操作方法
 

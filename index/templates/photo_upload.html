@@ -55,6 +55,7 @@
         </div>
     </div>
     <script>
+        const uploadForm = document.getElementById('uploadForm');
         const photoInput = document.getElementById('photoInput');
         const preview = document.getElementById('preview');
         const status = document.getElementById('status');
@@ -76,8 +77,10 @@
 
         const progressBar = document.getElementById('progressBar');
         const uploadProgress = document.getElementById('uploadProgress');
+        const CHUNK_SIZE = 512 * 1024; // 512KB
+        const LARGE_FILE_SIZE = 1 * 1024 * 1024; // 1MB
 
-        uploadButton.addEventListener('click', () => {
+        uploadButton.addEventListener('click', async () => {
             const files = Array.from(photoInput.files);
             if (files.length === 0) {
                 alert('请选择至少一张照片。');
@@ -87,42 +90,139 @@
             progressBar.style.display = 'block';
             uploadProgress.style.width = '0%';
 
-            const formData = new FormData();
-            files.forEach(file => formData.append('photos', file));
+            let totalSize = files.reduce((sum, file) => sum + file.size, 0);
+            let uploadedSize = 0;
 
-            const xhr = new XMLHttpRequest();
-            xhr.open('POST', "{% url 'index:photo_upload' %}");
-            xhr.setRequestHeader('X-CSRFToken', getCookie('csrftoken'));
-
-            xhr.upload.onprogress = (event) => {
-                if (event.lengthComputable) {
-                    const percent = Math.round((event.loaded / event.total) * 100);
-                    uploadProgress.style.width = percent + '%';
-                    status.textContent = `上传进度：${percent}%`;
-                }
-            };
-
-            xhr.onload = () => {
-                progressBar.style.display = 'none';
-                try {
-                    const data = JSON.parse(xhr.responseText);
-                    if (data.status === 'success') {
-                        status.textContent = '已提交照片，已开始后台特征提取。稍候刷新我的上传页面查看结果。';
+            try {
+                for (const file of files) {
+                    if (file.size > LARGE_FILE_SIZE) {
+                        await uploadPhotoInChunks(file, (bytes) => {
+                            uploadedSize += bytes;
+                            updateProgress(uploadedSize, totalSize);
+                        });
                     } else {
-                        status.textContent = data.message || '上传失败，请重试。';
+                        await uploadPhotoFile(file, (bytes) => {
+                            uploadedSize += bytes;
+                            updateProgress(uploadedSize, totalSize);
+                        });
                     }
-                } catch (err) {
-                    status.textContent = '上传响应解析失败。';
                 }
-            };
-
-            xhr.onerror = () => {
+                status.textContent = '已提交照片，已开始后台特征提取。稍候刷新我的上传页面查看结果。';
+            } catch (err) {
+                status.textContent = err.message || '上传失败，请重试。';
+            } finally {
                 progressBar.style.display = 'none';
-                status.textContent = '上传请求失败，请检查网络。';
-            };
-
-            xhr.send(formData);
+            }
         });
+
+        async function uploadPhotoFile(file, onProgress) {
+            const formData = new FormData();
+            formData.append('photos', file);
+            const csrfToken = document.querySelector('input[name="csrfmiddlewaretoken"]')?.value || getCookie('csrftoken');
+            if (csrfToken) {
+                formData.append('csrfmiddlewaretoken', csrfToken);
+            }
+
+            return new Promise((resolve, reject) => {
+                const xhr = new XMLHttpRequest();
+                xhr.open('POST', "{% url 'index:photo_upload' %}");
+                if (csrfToken) {
+                    xhr.setRequestHeader('X-CSRFToken', csrfToken);
+                }
+                xhr.upload.onprogress = (event) => {
+                    if (event.lengthComputable && onProgress) {
+                        onProgress(event.loaded);
+                    }
+                };
+                xhr.onload = () => {
+                    if (xhr.status === 200) {
+                        const data = JSON.parse(xhr.responseText);
+                        if (data.status === 'success') {
+                            resolve(data);
+                        } else {
+                            reject(new Error(data.message || '上传失败，请重试。'));
+                        }
+                    } else {
+                        reject(new Error(`上传失败：${xhr.status} ${xhr.statusText}`));
+                    }
+                };
+                xhr.onerror = () => reject(new Error('上传请求失败，请检查网络。'));
+                xhr.send(formData);
+            });
+        }
+
+        async function uploadPhotoInChunks(file, onProgress) {
+            const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
+            const fileId = `${file.name}-${file.size}-${file.lastModified}`;
+            const csrfToken = document.querySelector('input[name="csrfmiddlewaretoken"]')?.value || getCookie('csrftoken');
+
+            for (let currentChunk = 0; currentChunk < totalChunks; currentChunk++) {
+                const start = currentChunk * CHUNK_SIZE;
+                const end = Math.min(file.size, start + CHUNK_SIZE);
+                const chunk = file.slice(start, end);
+                const formData = new FormData();
+                formData.append('chunk', chunk);
+                formData.append('file_name', file.name);
+                formData.append('file_id', fileId);
+                formData.append('chunk_index', currentChunk);
+                formData.append('total_chunks', totalChunks);
+                formData.append('media_type', 'photo');
+                if (csrfToken) {
+                    formData.append('csrfmiddlewaretoken', csrfToken);
+                }
+
+                await new Promise((resolve, reject) => {
+                    const xhr = new XMLHttpRequest();
+                    xhr.open('POST', "{% url 'index:upload_chunk' %}");
+                    if (csrfToken) {
+                        xhr.setRequestHeader('X-CSRFToken', csrfToken);
+                    }
+                    xhr.onload = () => {
+                        if (xhr.status === 200) {
+                            if (onProgress) onProgress(chunk.size);
+                            resolve();
+                        } else {
+                            reject(new Error(`分片上传失败：${xhr.status} ${xhr.statusText}`));
+                        }
+                    };
+                    xhr.onerror = () => reject(new Error('分片上传请求失败，请检查网络。'));
+                    xhr.send(formData);
+                });
+            }
+
+            await mergePhotoChunks(fileId, file.name, csrfToken);
+        }
+
+        async function mergePhotoChunks(fileId, fileName, csrfToken) {
+            return new Promise((resolve, reject) => {
+                const xhr = new XMLHttpRequest();
+                xhr.open('POST', "{% url 'index:merge_chunks' %}");
+                if (csrfToken) {
+                    xhr.setRequestHeader('X-CSRFToken', csrfToken);
+                }
+                xhr.setRequestHeader('Content-Type', 'application/json');
+                xhr.onload = () => {
+                    if (xhr.status === 200) {
+                        const response = JSON.parse(xhr.responseText);
+                        if (response.status === 'success') {
+                            resolve(response);
+                        } else {
+                            reject(new Error(response.message || '合并失败，请重试。'));
+                        }
+                    } else {
+                        reject(new Error(`合并失败：${xhr.status} ${xhr.statusText}`));
+                    }
+                };
+                xhr.onerror = () => reject(new Error('合并请求失败，请检查网络。'));
+                xhr.send(JSON.stringify({ file_id: fileId, file_name: fileName, media_type: 'photo' }));
+            });
+        }
+
+        function updateProgress(uploaded, total) {
+            const percent = total > 0 ? Math.round((uploaded / total) * 100) : 0;
+            uploadProgress.style.width = percent + '%';
+            status.textContent = `上传进度：${percent}%`;
+        }
 
         function getCookie(name) {
             const value = `; ${document.cookie}`;

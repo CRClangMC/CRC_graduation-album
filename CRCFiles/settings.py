@@ -20,19 +20,25 @@ ALLOWED_HOSTS = ["*"]
 
 # Trusted origins for CSRF when serving the site via HTTPS or a proxy.
 # Add your external domain and port used by the browser (scheme + host[:port]).
-# Example: https://ftcdstudio.com:4500
+# Example: https://myhost.com
 CSRF_TRUSTED_ORIGINS = [
-    '',
+    "https://myhost.com/",
 ]
+
+# Django upload limits. For large files behind a reverse proxy, the proxy still
+# needs its own client_max_body_size / max_request_body_size configuration.
+DATA_UPLOAD_MAX_MEMORY_SIZE = 200 * 1024 * 1024
+FILE_UPLOAD_MAX_MEMORY_SIZE = 200 * 1024 * 1024
 
 # When the site is served behind a reverse proxy that terminates TLS, enable
 # the following so Django knows the original request was secure. Adjust header
 # name if your proxy uses a different one (most use X-Forwarded-Proto).
-#SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
-# If you're serving over HTTPS, consider enabling secure cookies:
-#SESSION_COOKIE_SECURE = True
-#CSRF_COOKIE_SECURE = True
+# 如果生产环境使用 HTTPS，建议启用安全 Cookie
+if not DEBUG:
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
 
 # Application definition
 

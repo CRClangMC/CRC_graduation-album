@@ -569,10 +569,12 @@ def upload_chunk(request):
     file_id = request.POST.get('file_id')
     chunk_index = request.POST.get('chunk_index')
     file_name = request.POST.get('file_name')
+    media_type = request.POST.get('media_type', 'video')
     if not all([chunk, file_id, chunk_index, file_name]):
         return JsonResponse({'status': 'error', 'message': '参数不完整'})
 
-    chunk_dir = os.path.join(settings.BASE_DIR, 'static', 'vdo', 'chunks', file_id)
+    base_dir = os.path.join(settings.BASE_DIR, 'static', 'pic' if media_type == 'photo' else 'vdo')
+    chunk_dir = os.path.join(base_dir, 'chunks', file_id)
     ensure_directory(chunk_dir)
     chunk_path = os.path.join(chunk_dir, f'chunk_{chunk_index}')
     with open(chunk_path, 'wb+') as f:
@@ -590,10 +592,12 @@ def merge_chunks(request):
         body = json.loads(request.body.decode('utf-8'))
         file_id = body.get('file_id')
         file_name = body.get('file_name')
+        media_type = body.get('media_type', 'video')
         if not file_id or not file_name:
             return JsonResponse({'status': 'error', 'message': '参数不完整'})
 
-        chunk_dir = os.path.join(settings.BASE_DIR, 'static', 'vdo', 'chunks', file_id)
+        base_dir = os.path.join(settings.BASE_DIR, 'static', 'pic' if media_type == 'photo' else 'vdo')
+        chunk_dir = os.path.join(base_dir, 'chunks', file_id)
         if not os.path.exists(chunk_dir):
             return JsonResponse({'status': 'error', 'message': '分片目录不存在'})
 
@@ -601,24 +605,37 @@ def merge_chunks(request):
         md5_name = hashlib.md5(f'{file_name}-{time.time()}'.encode('utf-8')).hexdigest()
         _, extension = os.path.splitext(file_name)
         encrypted_name = f'{md5_name}{extension}'
-        final_path = os.path.join(settings.BASE_DIR, 'static', 'vdo', encrypted_name)
+        final_path = os.path.join(base_dir, encrypted_name)
         with open(final_path, 'wb+') as outfile:
             for chunk_file in chunk_files:
                 chunk_path = os.path.join(chunk_dir, chunk_file)
                 with open(chunk_path, 'rb') as infile:
                     outfile.write(infile.read())
 
-        relative_path = f'/static/vdo/{encrypted_name}'
         record_id = str(int(time.time() * 1000)) + uuid.uuid4().hex[:8]
         creater = request.session.get('username', 'anonymous')
-        thumbnail_path = create_video_thumbnail(final_path, record_id)
-        try:
-            mdb_insert_file(record_id, file_name, encrypted_name, creater, thumbnail_path, get_current_timestamp())
-        except Exception:
-            pass
+
+        if media_type == 'photo':
+            relative_path = f'/static/pic/{encrypted_name}'
+            try:
+                with open(final_path, 'rb') as f:
+                    vectors = extract_vectors_from_bytes(f.read())
+                create_pic_records(relative_path, vectors, creater)
+                rebuild_faiss_index()
+            except Exception:
+                pass
+            response_files = [{'id': record_id, 'path': relative_path}]
+        else:
+            relative_path = f'/static/vdo/{encrypted_name}'
+            thumbnail_path = create_video_thumbnail(final_path, record_id)
+            try:
+                mdb_insert_file(record_id, file_name, encrypted_name, creater, thumbnail_path, get_current_timestamp())
+            except Exception:
+                pass
+            response_files = [{'id': record_id, 'path': relative_path, 'thumbnail_path': thumbnail_path}]
 
         import shutil
         shutil.rmtree(chunk_dir)
-        return JsonResponse({'status': 'success', 'files': [{'id': record_id, 'path': relative_path, 'thumbnail_path': thumbnail_path}]})
+        return JsonResponse({'status': 'success', 'files': response_files})
     except Exception as e:
         return JsonResponse({'status': 'error', 'message': str(e)})

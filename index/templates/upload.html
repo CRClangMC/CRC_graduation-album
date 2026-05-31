@@ -71,13 +71,18 @@
 
         async function uploadSmallFile(file) {
             const formData = new FormData();
-            formData.append("myfiles", file);
-            const csrfToken = getCookie("csrftoken");
+            formData.append("videos", file);
+            const csrfToken = document.querySelector('input[name="csrfmiddlewaretoken"]')?.value || getCookie("csrftoken");
+            if (csrfToken) {
+                formData.append("csrfmiddlewaretoken", csrfToken);
+            }
 
             return new Promise((resolve, reject) => {
                 const xhr = new XMLHttpRequest();
-                xhr.open("POST", "/upload/", true);
-                xhr.setRequestHeader("X-CSRFToken", csrfToken);
+                xhr.open("POST", "{% url 'index:upload_video' %}", true);
+                if (csrfToken) {
+                    xhr.setRequestHeader("X-CSRFToken", csrfToken);
+                }
 
                 xhr.upload.onprogress = throttle((event) => {
                     if (event.lengthComputable) {
@@ -120,8 +125,10 @@
 
                 await new Promise((resolve, reject) => {
                     const xhr = new XMLHttpRequest();
-                    xhr.open("POST", "/upload_chunk/", true);
-                    xhr.setRequestHeader("X-CSRFToken", csrfToken);
+                    xhr.open("POST", "{% url 'index:upload_chunk' %}", true);
+                    if (csrfToken) {
+                        xhr.setRequestHeader("X-CSRFToken", csrfToken);
+                    }
 
                     xhr.onload = () => {
                         if (xhr.status === 200) {
@@ -147,8 +154,10 @@
 
             return new Promise((resolve, reject) => {
                 const xhr = new XMLHttpRequest();
-                xhr.open("POST", "/merge_chunks/", true);
-                xhr.setRequestHeader("X-CSRFToken", csrfToken);
+                xhr.open("POST", "{% url 'index:merge_chunks' %}", true);
+                if (csrfToken) {
+                    xhr.setRequestHeader("X-CSRFToken", csrfToken);
+                }
                 xhr.setRequestHeader("Content-Type", "application/json");
 
                 xhr.onload = () => {
@@ -227,7 +236,7 @@
     <h1>文件上传</h1>
     <form id="uploadForm" method="post" enctype="multipart/form-data">
         {% csrf_token %}
-        <input type="file" id="fileInput" multiple>
+        <input type="file" id="fileInput" name="videos" multiple>
         <button type="button" onclick="uploadFiles()">上传</button>
         <button type="button" onclick="location.href='/index/'">文件库</button>
     </form>
