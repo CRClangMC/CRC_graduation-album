@@ -16,7 +16,7 @@
 
 - Python 3.8+（建议使用虚拟环境）
 - Windows 环境
-- Microsoft Access ODBC 驱动（`Microsoft Access Driver (*.mdb, *.accdb)`）
+- Microsoft Access ODBC 驱动（`Microsoft Access Driver (*.mdb, *.accdb)`）（下载链接` https://www.microsoft.com/en-my/download/details.aspx?id=54920 `）
 - 安装所需 Python 库：
   - `Django`
   - `pyodbc`
@@ -55,7 +55,7 @@ CSRF_TRUSTED_ORIGINS = [
 ]
 ```
 
-访问nginx官网并下载Windows环境压缩包（https://nginx.org/download/nginx-1.30.2.zip），解压并作为你的nginx目录
+访问nginx官网并下载Windows环境压缩包（` https://nginx.org/download/nginx-1.30.2.zip `），解压并作为你的nginx目录
 在nginx目录下找到conf文件夹中的`nginx.conf`，按下述进行配置
 
 `nginx.conf`的配置示例及说明
@@ -276,14 +276,13 @@ python extract_features.py 全部图片路径
 ## 注意事项
 
 - 请确保 Windows 系统中已安装 Access ODBC 驱动，否则 `data.mdb` 无法访问。
-- 当前 `users` 表密码采用明文存储，生产环境下建议改为哈希存储。
+- 当前 `users` 表密码采用明文存储，如需加密存储，请自行修改views.py中对密码的存储逻辑。
 - 如果 `DEBUG=False`，`STATIC_ROOT` 指向根目录下的 `static`，请确保 `collectstatic` 或部署环境正确处理静态文件。
 
 ## 许可证
 
-该项目当前未包含独立的 `LICENSE` 文件。
+本项目使用MIT许可证
 
-- 若你希望开源或分发该项目，请补充适当的开源许可证文件，如 `MIT`、`Apache-2.0`、`GPL-3.0` 等。
 - 项目依赖的前端库（如 Django admin 资源、jQuery、Select2 等）使用各自开源许可证，请根据需要保留和遵守这些依赖项的许可条款。
 - 本项目基于CRCfiles_v3.2开发
 
@@ -293,5 +292,6 @@ python extract_features.py 全部图片路径
 
 ```bash
 python manage.py runserver 0.0.0.0:8000
+waitress-serve --listen=127.0.0.1:8000 --max-request-body-size=200000000 CRCFiles.wsgi:application
 python extract_features.py path/to/source_images
 ```
