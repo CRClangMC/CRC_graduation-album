@@ -4,3 +4,4 @@ insightface==1.0.1
 numpy==2.4.4
 opencv-python==4.13.0.92
 pyodbc==5.3.0
+waitress==3.0.2
