@@ -642,7 +642,6 @@ def logout_view(request):
 def face_recognition(request):
     return render(request, 'face_recognition.html')
 
-
 def recognize_face(request):
     if request.method != 'POST':
         return JsonResponse({'status': 'error', 'message': '仅支持POST请求。'})

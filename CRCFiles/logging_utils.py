@@ -28,6 +28,9 @@ def write_log_line(line: str):
 
 
 def get_client_ip(request):
+    xri = request.META.get('HTTP_X_REAL_IP')
+    if xri:
+        return xri.strip()
     xff = request.META.get('HTTP_X_FORWARDED_FOR')
     if xff:
         return xff.split(',')[0].strip()

@@ -109,7 +109,8 @@ http {
             # 传递真实 IP 和协议头 (Django settings.py 中需要配合 SECURE_PROXY_SSL_HEADER 使用)
             proxy_set_header Host $host;
             proxy_set_header X-Real-IP $remote_addr;
-            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            # 推荐使用 $remote_addr 以避免客户端伪造 X-Forwarded-For
+            proxy_set_header X-Forwarded-For $remote_addr;
             proxy_set_header X-Forwarded-Proto $scheme;
         }
     }
