@@ -1,5 +1,6 @@
 from django.urls import path
 from django.views.static import serve
+from django.views.generic.base import RedirectView
 from django.conf import settings
 from . import views
 
@@ -7,6 +8,7 @@ app_name = 'index'
 
 urlpatterns = [
     path('', views.home, name='home'),
+    path('favicon.ico', RedirectView.as_view(url='/static/favicon.ico')),
     path('login/', views.login_view, name='login'),
     path('logout/', views.logout_view, name='logout'),
     path('register/', views.register, name='register'),
