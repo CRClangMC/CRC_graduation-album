@@ -210,9 +210,10 @@ http://127.0.0.1:8000/
 - 视频上传地址：`/upload/`（视图名：`upload_video`）
   - 需登录
   - 上传视频后会保存到 `media/vdo/`，并在 `data.mdb` 的 `vdo` 表中记录文件信息（注意：项目已将原来 `files` 表逻辑替换为 `vdo`）。
-- 视频展示：`/videos/`（视图名：`video_gallery`）
+  - 视频展示：`/videos/`（视图名：`video_gallery`）
   - 支持视频在线预览。
   - 视频缩略图对访客可见，视频原文件下载需要登录。
+  - 上传或通过脚本录入的视频会自动生成首帧缩略图，保存到 `media/vdo/thumbnails/`，并将相对路径写入 `vdo` 表的 `缩略图路径` 字段。
   - 预览页已优化为大视频流式加载：使用 `Range` 请求和 `preload="none"`，避免一次性拉取整个大文件。
 - 视频删除：`/delete/`（视图名：`delete_files`）
   - 需登录
@@ -292,14 +293,24 @@ DELETE_PASSWORD = "admin" #os.environ.get('DELETE_PASSWORD', 'change_this_delete
 ### 批量特征提取脚本
 
 - `extract_features.py`
-  - 从指定目录读取图片
-  - 提取人脸特征向量
-  - 将结果写入 `data.mdb` 的 `pic` 表
-  - 使用如下命令进行批量特征提取，在项目根目录运行：
+  - 交互式脚本：启动后按提示操作：
+    - 选项：`1` = 仅录入图片（提取人脸向量并写入 `pic` 表）
+    - 选项：`2` = 仅录入视频（将视频文件保存到 `media/vdo/` 并写入 `vdo` 表）
+    - 选项：`0` = 同时录入目录下的所有图片与视频
+  - 图片处理：提取人脸向量，按向量数量为每张人脸在 `pic` 表写入一条记录，字段与 `pic` 表兼容（`ID`,`vector`,`path`,`creater`,`time`）
+  - 视频处理：不做向量提取，仅保存文件到 `media/vdo/` 并在 `vdo` 表写入记录，写入字段包括 `ID`（主键，生成格式示例 `str(int(time.time()*1000))+uuid.prefix`）、`文件名`（原始名）、`上传者`、`md5文件名`（保存到磁盘的加密名）、`缩略图路径`（脚本会生成首帧缩略图并写入此字段，路径示例 `/media/vdo/thumbnails/{ID}.jpg`）与 `时间`
+  - 推荐先备份 `data.mdb` 再执行写入操作，避免不可逆的数据修改
+  - 默认上传者请在py下编辑`creater = '管理员'  # 默认创建者名称`
+  - 运行方式（在项目根目录执行）：
 
 ```bash
-python extract_features.py 全部图片路径
+python extract_features.py
+# 按提示输入选项与目录路径，例如：
+# 请输入选项(1/2/0): 0
+# 请输入要处理的目录路径: E:\path\to\your pic and vdo path
 ```
+
+  - 注意：脚本依赖 `insightface` 模型与 OpenCV，运行前确保按上文“环境准备”安装依赖并能正确加载模型。
 
 ## 注意事项
 
