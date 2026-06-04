@@ -1,1 +1,1 @@
-waitress-serve --listen=127.0.0.1:8000 --max-request-body-size=200000000 CRCFiles.wsgi:application
+waitress-serve --listen=0.0.0.0:8000 --max-request-body-size=200000000 CRCFiles.wsgi:application

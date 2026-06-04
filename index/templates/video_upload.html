@@ -25,7 +25,10 @@
                 <h1>视频上传</h1>
                 <p>请上传毕业视频。</p>
             </div>
-            <a href="{% url 'index:home' %}">返回首页</a>
+            <div style="display:flex;gap:12px;align-items:center;">
+                <a href="{% url 'index:delete_files' %}" style="color:#f472b6; text-decoration:none;">管理我的上传</a>
+                <a href="{% url 'index:home' %}">返回首页</a>
+            </div>
         </div>
         <div class="box">
             <form id="videoUploadForm" method="POST" enctype="multipart/form-data">

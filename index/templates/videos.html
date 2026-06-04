@@ -35,7 +35,7 @@
         <div class="header">
             <div>
                 <h1>视频库</h1>
-                <p>浏览所有上传到毕业视频库的资源。</p>
+                <p>浏览所有上传到毕业视频库的资源。下载视频请登录。</p>
             </div>
             <a href="{% url 'index:home' %}">返回首页</a>
         </div>
@@ -46,13 +46,16 @@
                     {% if video.thumbnail_path %}
                     <img class="thumb" src="{{ video.thumbnail_path }}" alt="{{ video.file_name }}">
                     {% else %}
-                    <div class="placeholder">未生成缩略图</div>
+                    <div class="placeholder">无封面</div>
                     {% endif %}
                     <div class="meta">
                         <h3>{{ video.file_name }}</h3>
                         <p>上传者：{{ video.creater }}</p>
                         <p>上传时间：{{ video.created_at }}</p>
-                        <a class="watch-button" href="{{ video.path }}">查看视频</a>
+                        <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:12px;">
+                            <a class="watch-button" href="{{ video.preview_url }}" target="_blank">预览</a>
+                            <a class="watch-button" href="{{ video.path }}">下载</a>
+                        </div>
                     </div>
                 </div>
                 {% endfor %}

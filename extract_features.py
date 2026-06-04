@@ -17,7 +17,7 @@ from insightface.app import FaceAnalysis
 
 
 def ensure_directories():
-    pic_dir = BASE_DIR / 'static' / 'pic'
+    pic_dir = BASE_DIR / 'media' / 'pic'
     pic_dir.mkdir(parents=True, exist_ok=True)
     return pic_dir
 
@@ -64,7 +64,7 @@ def save_photo_record(image_path: str, vectors, creator='郎士淇'):
     with open(image_path, 'rb') as src, open(target_path, 'wb') as dst:
         dst.write(src.read())
 
-    relative_path = f'/static/pic/{file_name}'
+    relative_path = f'/media/pic/{file_name}'
     # 将记录写入 Access 数据库（data.mdb）
     DBfile = os.path.join(os.getcwd(), 'data.mdb')
     conn_str = (

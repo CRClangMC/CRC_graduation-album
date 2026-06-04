@@ -191,6 +191,8 @@ http://127.0.0.1:8000/
 
 - 页面地址：`/face_recognition/`
 - 系统会通过摄像头或本地上传照片提取人脸特征向量，查询 `data.mdb` 中 `pic` 表的相似照片。
+- 未登录访客限制最多 2 次识别请求，超过次数后需登录继续使用。
+- 访客限制按 IP 记录并持久化到 `temp/guest_face_limit.json`。
 
 ### 4. 照片上传与历史记录
 
@@ -200,21 +202,31 @@ http://127.0.0.1:8000/
 - 历史照片查看：`/my_uploads/`
   - 需登录
   - 显示当前用户上传的照片及时间信息
+  - 新增复选框删除功能，可在页面中选择照片并直接删除自己上传的照片（无需密码）
 
 ### 5. 视频功能
 
-- 视频上传地址：`/upload/`
+- 视频上传地址：`/upload/`（视图名：`upload_video`）
   - 需登录
-  - 上传视频后会保存到 `static/vdo/`，并在 `data.mdb` 的 `files` 表中记录文件信息
-- 视频展示：`/videos/`
-- 视频删除：`/delete/`
+  - 上传视频后会保存到 `media/vdo/`，并在 `data.mdb` 的 `vdo` 表中记录文件信息（注意：项目已将原来 `files` 表逻辑替换为 `vdo`）。
+- 视频展示：`/videos/`（视图名：`video_gallery`）
+  - 支持视频在线预览。
+  - 视频缩略图对访客可见，视频原文件下载需要登录。
+  - 预览页已优化为大视频流式加载：使用 `Range` 请求和 `preload="none"`，避免一次性拉取整个大文件。
+- 视频删除：`/delete/`（视图名：`delete_files`）
   - 需登录
   - 支持删除视频文件与数据库记录
+  - 管理员删除密码的配置在 CRCFiles/settings.py 里（设置项：`DELETE_PASSWORD`）。
+
+```config
+DELETE_PASSWORD = "admin" #os.environ.get('DELETE_PASSWORD', 'change_this_delete_pwd')
+#如果可以设置环境变量请取消注释后面的的“#os.environ.get('DELETE_PASSWORD', 'change_this_delete_pwd')”并删除"admin"
+```
 
 ### 6. 搜索与 API
 
 - 搜索接口：`/api/search?query=关键字`
-- 文件列表接口：`/api/files?page=1`
+- 文件列表接口：`/api/vdo?page=1`
 
 ## 数据库结构
 
@@ -236,15 +248,15 @@ http://127.0.0.1:8000/
 #### `pic`
 - `ID` VARCHAR(255) - 唯一记录 ID
 - `vector` LONGCHAR - 人脸特征向量 JSON
-- `path` LONGCHAR - 照片静态路径，例如 `/static/pic/xxxx.jpg`
+- `path` LONGCHAR - 照片静态路径，例如 `/media/pic/xxxx.jpg`（项目已将照片存放迁移到 `media/pic/`）
 - `creater` VARCHAR(255) - 上传者用户名
 - `time` VARCHAR(255) - 上传时间字符串
 
-#### `files`
+#### `vdo`
 - `ID` VARCHAR(50) - 唯一视频记录 ID
 - `文件名` LONGCHAR - 原始文件名
 - `上传者` VARCHAR(50) - 上传用户
-- `md5文件名` LONGCHAR - 存储在 `static/vdo/` 的加密文件名
+- `md5文件名` LONGCHAR - 存储在 `media/vdo/` 的加密文件名
 - `缩略图路径` VARCHAR(255) - 视频封面缩略图路径
 - `时间` VARCHAR(255) - 上传时间字符串
 
@@ -257,9 +269,24 @@ http://127.0.0.1:8000/
   - `mdb_insert_file`
 - 人脸识别依赖 `insightface` 和 `faiss`
 - 上传文件保存位置：
-  - 照片保存到 `static/pic/`
-  - 视频保存到 `static/vdo/`
+  - 照片保存到 `media/pic/`（项目已将照片存放迁移到 media 目录）
+  - 视频保存到 `media/vdo/`（包括 `media/vdo/thumbnails/`）
   - 上传临时文件保存到 `temp/`
+
+- 访问控制与签名：
+  - 对外提供 `media` 下文件的访问使用 HMAC-SHA256 签名保护，签名绑定客户端 IP，签名相关函数在 `index/views.py`（`generate_media_key` / `verify_media_key`）。
+  - 签名密钥由 `MEDIA_ACCESS_SECRET` 控制，可通过环境变量覆盖（参见 `CRCFiles/settings.py`）。
+  - 视频展示缩略图可对访客显示，但视频原文件下载/观看必须登录。
+  - 未登录访客人脸识别次数按 IP 限制，记录文件保存到 `temp/guest_face_limit.json`。
+
+- 删除与登录防暴力破解：
+  - `delete_files` 路由：视频删除使用固定删除密码（`DELETE_PASSWORD`）并有 IP 锁定保护；照片删除允许登录用户直接删除自己上传的照片（无需密码）。管理员删除密码的配置在 CRCFiles/settings.py 里（设置项：`DELETE_PASSWORD`）。
+
+  - `login` 和 `delete` 操作均使用 IP 绑定的错误尝试保护：连续 5 次错误后该 IP 封禁 60 秒。
+
+- 日志与中间件：
+  - 新增 `CRCFiles/logging_utils.py`（日志写入工具）和 `CRCFiles/middleware.py`（`RequestLoggingMiddleware`），中间件会记录所有普通的页面 GET 请求以及状态码 >=400 的非法访问。
+  - 日志文件保存在 `log/` 目录，按 4 小时分段（文件名格式：`YYYY-MM-DD_HH-HH.log`），同时在控制台输出简化行以便快速查看。
 
 ### 批量特征提取脚本
 
@@ -284,7 +311,7 @@ python extract_features.py 全部图片路径
 本项目使用MIT许可证
 
 - 项目依赖的前端库（如 Django admin 资源、jQuery、Select2 等）使用各自开源许可证，请根据需要保留和遵守这些依赖项的许可条款。
-- 本项目基于CRCfiles_v3.2开发
+- 本项目基于CRCfiles_v3.2开发。
 
 ---
 

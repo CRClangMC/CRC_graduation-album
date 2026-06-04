@@ -16,7 +16,7 @@ class Pic(models.Model):
         return self.path
 
 
-class File(models.Model):
+class Vdo(models.Model):
     id = models.CharField(max_length=50, primary_key=True)
     file_name = models.CharField(max_length=255)
     path = models.CharField(max_length=255)
@@ -24,7 +24,7 @@ class File(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        db_table = 'files'
+        db_table = 'vdo'
         managed = False
 
     def __str__(self):

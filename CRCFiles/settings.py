@@ -56,6 +56,7 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
+    'CRCFiles.middleware.RequestLoggingMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
@@ -164,3 +165,16 @@ if DEBUG:
 else:
     STATIC_URL = '/static/'
     STATIC_ROOT = os.path.join(BASE_DIR, "static")
+
+# Media 配置：项目根下的 media 文件夹
+MEDIA_URL = '/media/'
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+# 日志目录
+LOG_ROOT = os.path.join(BASE_DIR, 'log')
+# 用于生成和校验 media 访问签名的密钥（生产环境请设置环境变量）
+MEDIA_ACCESS_SECRET = os.environ.get('MEDIA_ACCESS_SECRET', SECRET_KEY)
+# 用于删除操作的固定密码，生产环境建议通过环境变量设置
+DELETE_PASSWORD = "admin" #os.environ.get('DELETE_PASSWORD', 'change_this_delete_pwd')
+# 登录与删除操作防暴力破解保护：连续错误次数达到后按 IP 锁定等待
+AUTH_PROTECT_MAX_FAILS = int(os.environ.get('AUTH_PROTECT_MAX_FAILS', '5'))
+AUTH_PROTECT_LOCK_SECONDS = int(os.environ.get('AUTH_PROTECT_LOCK_SECONDS', '60'))

@@ -29,6 +29,7 @@
     </div>
     <form action="{% url 'index:login' %}" method="POST">
       {% csrf_token %}
+      <input type="hidden" name="next" value="{{ next }}">
       <div>
         <label for="txtuser">用户名</label>
         <input id="txtuser" name="username" type="text" required>

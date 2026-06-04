@@ -275,6 +275,36 @@
             messageElement.textContent = `已发起 ${paths.length} 张照片下载。`;
         }
 
+        function handleRecognitionResult(data) {
+            if (data.status === 'success') {
+                if (data.photos.length === 0) {
+                    messageElement.textContent = '未识别到匹配照片，请更换姿势或重试。';
+                    resultGallery.innerHTML = '';
+                    paginationControls.innerHTML = '';
+                } else {
+                    pagedResults = data.photos;
+                    currentPage = 1;
+                    const totalPages = Math.ceil(pagedResults.length / pageSize);
+                    messageElement.textContent = `找到 ${pagedResults.length} 张匹配照片`;
+                    renderResults(currentPage);
+                    renderPagination(totalPages);
+                }
+                return;
+            }
+
+            if (data.message && data.message.includes('访客人脸识别次数已达上限')) {
+                const goLogin = confirm(data.message + '\n\n是否前往登录？');
+                if (goLogin) {
+                    window.location.href = '/login/?next=' + encodeURIComponent(window.location.pathname);
+                } else {
+                    messageElement.textContent = data.message;
+                }
+                return;
+            }
+
+            messageElement.textContent = data.message || '识别失败，请稍后重试。';
+        }
+
         captureButton.addEventListener('click', async () => {
             if (!agreementCheckbox.checked) {
                 messageElement.textContent = '请先同意隐私协议后再拍照识别。';
@@ -307,22 +337,7 @@
                     console.error('非 JSON 响应', text);
                     throw new Error('服务器返回非 JSON 响应，请检查后端或 CSRF 失败。');
                 }
-                if (data.status === 'success') {
-                    if (data.photos.length === 0) {
-                        messageElement.textContent = '未识别到匹配照片，请更换姿势或重试。';
-                        resultGallery.innerHTML = '';
-                        paginationControls.innerHTML = '';
-                    } else {
-                        pagedResults = data.photos;
-                        currentPage = 1;
-                        const totalPages = Math.ceil(pagedResults.length / pageSize);
-                        messageElement.textContent = `找到 ${pagedResults.length} 张匹配照片`;
-                        renderResults(currentPage);
-                        renderPagination(totalPages);
-                    }
-                } else {
-                    messageElement.textContent = data.message || '识别失败，请稍后重试。';
-                }
+                handleRecognitionResult(data);
             } catch (error) {
                 messageElement.textContent = '识别请求失败，请检查网络。';
             } finally {
@@ -370,22 +385,7 @@
                             console.error('非 JSON 响应', text);
                             throw new Error('服务器返回非 JSON 响应，请检查后端或 CSRF 失败。');
                         }
-                        if (data.status === 'success') {
-                            if (data.photos.length === 0) {
-                                messageElement.textContent = '未识别到匹配照片。';
-                                resultGallery.innerHTML = '';
-                                paginationControls.innerHTML = '';
-                            } else {
-                                pagedResults = data.photos;
-                                currentPage = 1;
-                                const totalPages = Math.ceil(pagedResults.length / pageSize);
-                                messageElement.textContent = `找到 ${pagedResults.length} 张匹配照片`;
-                                renderResults(currentPage);
-                                renderPagination(totalPages);
-                            }
-                        } else {
-                            messageElement.textContent = data.message || '识别失败，请稍后重试。';
-                        }
+                        handleRecognitionResult(data);
                     } catch (err) {
                         console.error('Local upload recognize error', err);
                         messageElement.textContent = err.message || '识别请求失败，请检查网络。';

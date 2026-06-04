@@ -25,8 +25,15 @@
     </form>
     <form method="POST" action="/delete/">
         {% csrf_token %}
-        <button type="submit">删除选中的文件</button>
-        <button type="button" onclick="location.href='/index/'">文件库</button>
+        {% if message %}
+            <div style="margin-bottom:12px;padding:12px;background:#ffe4e6;color:#9f1239;border:1px solid #fecdd3;border-radius:8px;">{{ message }}</div>
+        {% endif %}
+        <input type="hidden" name="delete_type" value="video">
+        <div style="margin-bottom:16px; display:flex; gap:12px; flex-wrap:wrap; align-items:center;">
+            <input type="hidden" name="delete_password" id="delete_password" value="">
+            <button type="submit" id="delete_submit" style="padding:10px 18px; background-color:#dc2626; color:#fff; border:none; border-radius:6px; cursor:pointer;">删除选中的文件</button>
+            <button type="button" onclick="location.href='/'" style="padding:10px 18px; background-color:#4caf50; color:#fff; border:none; border-radius:6px; cursor:pointer;">主页</button>
+        </div>
         <table>
             <thead>
                 <tr>
@@ -38,8 +45,8 @@
                 {% if files %}
                     {% for file in files %}
                     <tr>
-                        <td><input type="checkbox" name="file_ids" value="{{ file.id }}"></td>
-                        <td>{{ file.name }}</td>
+                        <td><input type="checkbox" name="file_ids" value="{{ file.id }}" data-creater="{{ file.creater }}"></td>
+                        <td>{{ file.name }} <small style="color:#6b7280;">({{ file.creater }})</small></td>
                     </tr>
                     {% endfor %}
                 {% else %}
@@ -54,6 +61,39 @@
         document.addEventListener('DOMContentLoaded', function() {
             const searchForm = document.querySelector('form[method="GET"]');
             const tableBody = document.querySelector('table tbody');
+
+            // 拦截删除表单提交，判断是否包含他人上传的视频
+            const deleteForm = document.querySelector('form[method="POST"][action="/delete/"]');
+            if (deleteForm) {
+                const username = "{{ username }}";
+                deleteForm.addEventListener('submit', function(event) {
+                    const checked = Array.from(deleteForm.querySelectorAll('input[type="checkbox"][name="file_ids"]:checked'));
+                    if (checked.length === 0) {
+                        alert('请选择要删除的文件。');
+                        event.preventDefault();
+                        return;
+                    }
+                    let containsOthers = false;
+                    for (const cb of checked) {
+                        const owner = cb.getAttribute('data-creater') || '';
+                        if (owner !== username) {
+                            containsOthers = true;
+                            break;
+                        }
+                    }
+                    if (containsOthers) {
+                        const pwd = window.prompt('您正在尝试删除其他用户上传的视频，请输入删除密码（如您只需删除自己上传的文件，请勿勾选其他用户的上传）');
+                        if (!pwd) {
+                            event.preventDefault();
+                            return;
+                        }
+                        document.getElementById('delete_password').value = pwd;
+                    } else {
+                        // 确保隐藏密码为空
+                        document.getElementById('delete_password').value = '';
+                    }
+                });
+            }
 
             searchForm.addEventListener('submit', function(event) {
                 event.preventDefault(); // 阻止表单默认提交行为
