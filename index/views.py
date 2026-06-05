@@ -50,7 +50,35 @@ def load_guest_face_limit_data():
         return {}
     try:
         with open(file_path, 'r', encoding='utf-8') as f:
-            return json.load(f)
+            data = json.load(f)
+        # 保留历史封禁日期；封禁仅当天生效，非当日的 blocked_at 转移到 last_blocked_date
+        today = datetime.now().strftime('%Y-%m-%d')
+        changed = False
+        for ip, rec in list(data.items()):
+            if not isinstance(rec, dict):
+                continue
+            # 若有 blocked_at 且不是今天，则移动到 last_blocked_date 并清空 blocked_at
+            blocked_at = rec.get('blocked_at', '')
+            if blocked_at:
+                try:
+                    bdate = blocked_at.split(' ')[0]
+                except Exception:
+                    bdate = ''
+                if bdate and bdate != today:
+                    # 将历史封禁日期保存到 last_blocked_date（保留原值）
+                    rec['last_blocked_date'] = bdate
+                    rec['blocked_at'] = ''
+                    changed = True
+            # 如果 date 字段存在且不是今天，重置计数但保留 last_blocked_date
+            rec_date = rec.get('date', '')
+            if rec_date and rec_date != today:
+                rec['count'] = 0
+                rec['date'] = ''
+                changed = True
+            data[ip] = rec
+        if changed:
+            save_guest_face_limit_data(data)
+        return data
     except Exception:
         return {}
 
@@ -65,8 +93,19 @@ def is_guest_face_ip_blocked(ip: str) -> bool:
     if not ip:
         return False
     data = load_guest_face_limit_data()
-    record = data.get(ip, {})
-    return bool(record.get('blocked_at'))
+    record = data.get(ip)
+    if not record:
+        return False
+    # 若存在 blocked_at 且为今日，则视为被封禁；否则返回未封禁（保留历史 last_blocked_date）
+    blocked_at = record.get('blocked_at', '')
+    if not blocked_at:
+        return False
+    try:
+        bdate = blocked_at.split(' ')[0]
+    except Exception:
+        bdate = ''
+    today = datetime.now().strftime('%Y-%m-%d')
+    return bdate == today
 
 
 def increment_guest_face_attempt(ip: str):
@@ -74,12 +113,39 @@ def increment_guest_face_attempt(ip: str):
         return None
     with GUEST_FACE_LIMIT_LOCK:
         data = load_guest_face_limit_data()
-        record = data.get(ip, {'count': 0, 'blocked_at': ''})
-        if record.get('blocked_at'):
-            data[ip] = record
-            save_guest_face_limit_data(data)
-            return record
+        today = datetime.now().strftime('%Y-%m-%d')
+        record = data.get(ip, {'count': 0, 'blocked_at': '', 'date': ''})
+        # 如果记录不是今天的，需要重置计数并保留历史封禁日期
+        rec_date = record.get('date', '')
+        if rec_date != today:
+            # 若以前有非今日的 blocked_at，保存其日期到 last_blocked_date
+            prev_blocked = record.get('blocked_at', '')
+            if prev_blocked:
+                try:
+                    prev_date = prev_blocked.split(' ')[0]
+                except Exception:
+                    prev_date = ''
+                if prev_date:
+                    record['last_blocked_date'] = prev_date
+            # 重置今日记录
+            record['count'] = 0
+            record['blocked_at'] = ''
+            record['date'] = today
+
+        # 若已被封禁且封禁为今日，直接返回记录
+        blocked_at = record.get('blocked_at', '')
+        if blocked_at:
+            try:
+                bdate = blocked_at.split(' ')[0]
+            except Exception:
+                bdate = ''
+            if bdate == today:
+                data[ip] = record
+                save_guest_face_limit_data(data)
+                return record
+
         record['count'] = record.get('count', 0) + 1
+        record['date'] = today
         if record['count'] > 2:
             record['blocked_at'] = get_current_timestamp()
         data[ip] = record
