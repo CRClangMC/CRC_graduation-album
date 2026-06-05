@@ -55,4 +55,4 @@ def log_action(request, operation: str, operation_file: str = '', extra: str = '
     )
     write_log_line(log_line)
     # 简化版也输出到控制台
-    print(f"{timestamp} | {operation} | {username} | {operation_file} | {ip_address}")
+    print(f"{timestamp} | {operation} | {username} | {operation_file} | {ip_address} | {remark}")

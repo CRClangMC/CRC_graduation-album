@@ -20,7 +20,7 @@ ALLOWED_HOSTS = ["*"]
 
 # Trusted origins for CSRF when serving the site via HTTPS or a proxy.
 # Add your external domain and port used by the browser (scheme + host[:port]).
-# Example: https://myhost.com
+# Example: https://myhost.com/
 CSRF_TRUSTED_ORIGINS = [
     "https://myhost.com/",
 ]

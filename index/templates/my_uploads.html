@@ -57,11 +57,13 @@
             <div class="message-box">{{ message }}</div>
         {% endif %}
         {% if photos %}
-            <form method="POST" action="{% url 'index:delete_files' %}">
+            <form id="my-uploads-form" method="POST" action="{% url 'index:delete_files' %}">
                 {% csrf_token %}
                 <input type="hidden" name="delete_type" value="photo">
+                <input type="hidden" name="all_selected_ids" id="all_selected_ids" value="">
                 <div class="action-bar">
                     <button type="submit">删除选中照片</button>
+                    <span id="selected-count">已选 0 张</span>
                 </div>
                 <div class="grid">
                     {% for photo in photos %}
@@ -87,6 +89,72 @@
                     <a href="?page={{ page_obj.next_page_number }}">下一页</a>
                 {% endif %}
             </div>
+            <script>
+                (function() {
+                    const storageKey = 'my_uploads_selected_ids';
+                    const form = document.getElementById('my-uploads-form');
+                    const selectedCount = document.getElementById('selected-count');
+                    const hiddenInput = document.getElementById('all_selected_ids');
+
+                    function loadSelectedIds() {
+                        const raw = localStorage.getItem(storageKey) || '';
+                        return raw.split(',').filter(id => id.trim());
+                    }
+
+                    function saveSelectedIds(ids) {
+                        const unique = Array.from(new Set(ids.filter(id => id.trim())));
+                        localStorage.setItem(storageKey, unique.join(','));
+                    }
+
+                    function updateSelectedCount() {
+                        const ids = loadSelectedIds();
+                        selectedCount.textContent = `已选 ${ids.length} 张`;
+                    }
+
+                    function syncCheckboxes() {
+                        const ids = loadSelectedIds();
+                        document.querySelectorAll('input[name="file_ids"]').forEach(cb => {
+                            cb.checked = ids.includes(cb.value);
+                        });
+                        updateSelectedCount();
+                    }
+
+                    function updateSelection(event) {
+                        const ids = loadSelectedIds();
+                        const id = event.target.value;
+                        if (event.target.checked) {
+                            if (!ids.includes(id)) {
+                                ids.push(id);
+                            }
+                        } else {
+                            const idx = ids.indexOf(id);
+                            if (idx > -1) {
+                                ids.splice(idx, 1);
+                            }
+                        }
+                        saveSelectedIds(ids);
+                        updateSelectedCount();
+                    }
+
+                    document.querySelectorAll('input[name="file_ids"]').forEach(cb => {
+                        cb.addEventListener('change', updateSelection);
+                    });
+
+                    if (form) {
+                        form.addEventListener('submit', function(event) {
+                            const ids = loadSelectedIds();
+                            if (ids.length === 0) {
+                                event.preventDefault();
+                                alert('请先选择要删除的照片。');
+                                return;
+                            }
+                            hiddenInput.value = ids.join(',');
+                        });
+                    }
+
+                    syncCheckboxes();
+                })();
+            </script>
         {% else %}
             <div class="empty">你还没有上传任何照片。请前往“照片上传”提交毕业照。</div>
         {% endif %}

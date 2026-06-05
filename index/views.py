@@ -699,7 +699,9 @@ def login_view(request):
 def logout_view(request):
     try:
         if 'username' in request.session:
+            username = request.session.get('username')
             del request.session['username']
+            log_action(request, '登出', '', f'用户:{username} 已登出')
     except Exception:
         pass
     return redirect('index:home')
@@ -710,6 +712,7 @@ def face_recognition(request):
 
 def recognize_face(request):
     if request.method != 'POST':
+        log_action(request, '人脸识别', '', '非法请求方法')
         return JsonResponse({'status': 'error', 'message': '仅支持POST请求。'})
 
     if not request.session.get('username'):
@@ -730,6 +733,7 @@ def recognize_face(request):
             _, image_data = image_data.split(',', 1)
         image_bytes = base64.b64decode(image_data)
     except Exception:
+        log_action(request, '人脸识别', '', '无法解析图片数据')
         return JsonResponse({'status': 'error', 'message': '无法解析图片数据。'})
 
     temp_path = save_temp_camera_image(image_bytes)
@@ -740,7 +744,7 @@ def recognize_face(request):
             log_action(request, '人脸识别', '', '未检测到人脸')
             return JsonResponse({'status': 'error', 'message': '未检测到人脸，请重试。'})
         matches = search_similar_faces(vectors)
-        log_action(request, '人脸识别', '', f'检测到人脸数量: {len(vectors)}')
+        log_action(request, '人脸识别', '', f'检测到人脸数量:{len(vectors)} 匹配结果:{len(matches)}')
         photos = []
         for path in matches:
             # path 存储格式为 '/media/...'
@@ -781,11 +785,15 @@ def photo_upload(request):
 
 def _process_photo_upload_background(temp_path, original_name, creator):
     try:
-        vectors = extract_vectors_from_bytes(open(temp_path, 'rb').read())
+        log_action(None, '后台上传处理', temp_path, f'文件:{original_name} 用户:{creator} 开始处理')
+        file_bytes = open(temp_path, 'rb').read()
+        vectors = extract_vectors_from_bytes(file_bytes)
         stored_path = save_uploaded_photo(temp_path, original_name)
         create_pic_records(stored_path, vectors, creator)
         rebuild_faiss_index()
-    except Exception:
+        log_action(None, '后台上传处理', stored_path, f'文件:{original_name} 处理完成 向量数:{len(vectors)}')
+    except Exception as e:
+        log_action(None, '后台上传处理', temp_path, f'处理失败: {e}')
         if os.path.exists(temp_path):
             os.remove(temp_path)
 
@@ -827,6 +835,10 @@ def video_gallery(request):
 
 
 def video_preview(request, file_id):
+    if not request.session.get('username'):
+        log_action(request, '视频预览', file_id, '未登录尝试访问预览')
+        return redirect(f"/login/?next={request.path}")
+
     try:
         conn = _mdb_conn()
         cur = conn.cursor()
@@ -834,6 +846,7 @@ def video_preview(request, file_id):
         cur.close()
         conn.close()
         if not row or not row[0]:
+            log_action(request, '视频预览', file_id, '视频不存在')
             raise Http404('视频不存在')
         md5file, file_name, thumbnail_path = row[0], row[1], row[2]
         video_path = f"/media/vdo/{md5file}"
@@ -842,19 +855,22 @@ def video_preview(request, file_id):
         thumbnail_src = ''
         if thumbnail_path:
             thumbnail_src = f"{thumbnail_path}?key={generate_media_key(thumbnail_path, client_ip)}"
-        download_url = reverse('index:watch_video', args=[file_id]) if request.session.get('username') else f"/login/?next={reverse('index:watch_video', args=[file_id])}"
+        download_url = reverse('index:watch_video', args=[file_id])
+        log_action(request, '视频预览', file_id, f'预览页面访问 成功 文件名:{file_name}')
         return render(request, 'video_preview.html', {
             'video_src': preview_src,
             'download_url': download_url,
             'file_name': file_name,
             'thumbnail_path': thumbnail_src,
         })
-    except Exception:
+    except Exception as e:
+        log_action(request, '视频预览', file_id, f'预览失败: {e}')
         raise Http404('视频不存在')
 
 
 def watch_video(request, file_id):
     if not request.session.get('username'):
+        log_action(request, '观看视频', '', '未登录尝试访问')
         return redirect(f"/login/?next={request.path}")
 
     try:
@@ -864,12 +880,15 @@ def watch_video(request, file_id):
         cur.close()
         conn.close()
         if not row or not row[0]:
+            log_action(request, '观看视频', file_id, '视频不存在')
             raise Http404('视频不存在')
         md5file = row[0]
         video_path = f"/media/vdo/{md5file}"
         key = generate_media_key(video_path, get_client_ip(request))
+        log_action(request, '观看视频', file_id, f'重定向至视频文件:{video_path}')
         return redirect(f"{video_path}?key={key}")
-    except Exception:
+    except Exception as e:
+        log_action(request, '观看视频', file_id, f'视频访问失败: {e}')
         raise Http404('视频不存在')
 
 
@@ -880,9 +899,15 @@ def delete_files(request):
         # 区分照片删除与视频删除：照片允许登录用户直接删除自己上传的照片（无需密码），视频删除仍需密码保护与 IP 锁定
         delete_type = request.POST.get('delete_type', 'video')
         if delete_type == 'photo':
-            file_ids = request.POST.getlist('file_ids')
+            current_file_ids = request.POST.getlist('file_ids')
+            all_selected_ids = request.POST.get('all_selected_ids', '')
+            file_ids = set(filter(None, current_file_ids))
+            if all_selected_ids:
+                file_ids.update([fid.strip() for fid in all_selected_ids.split(',') if fid.strip()])
+            file_ids = list(file_ids)
             if not file_ids:
                 message = '请选择要删除的文件。'
+                log_action(request, '删除照片', '', '未选择文件')
             else:
                 username = request.session.get('username', '')
                 mdb_delete_pics_by_ids(file_ids, creater=username)
@@ -893,6 +918,7 @@ def delete_files(request):
             file_ids = request.POST.getlist('file_ids')
             if not file_ids:
                 message = '请选择要删除的文件。'
+                log_action(request, '删除视频', '', '未选择文件')
             else:
                 username = request.session.get('username', '')
                 # 检查所选视频的拥有者
@@ -920,11 +946,13 @@ def delete_files(request):
                 locked, wait_seconds = is_ip_locked(client_ip)
                 if locked:
                     message = f'尝试过多，请等待 {wait_seconds} 秒后再试。'
+                    log_action(request, '删除视频', ','.join(file_ids), f'IP锁定 等待{wait_seconds}s')
                 else:
                     password = request.POST.get('delete_password', '')
                     if password != getattr(settings, 'DELETE_PASSWORD', ''):
                         record_failed_attempt(client_ip)
                         message = '删除密码错误。'
+                        log_action(request, '删除视频', ','.join(file_ids), '删除密码错误')
                     else:
                         reset_failed_attempts(client_ip)
                         mdb_delete_files_by_ids(file_ids)
@@ -964,8 +992,8 @@ def upload_video(request):
             thumbnail_path = create_video_thumbnail(destination_path, file_id)
             try:
                 mdb_insert_file(file_id, file_name, encrypted_name, creater, thumbnail_path, get_current_timestamp())
-            except Exception:
-                pass
+            except Exception as e:
+                log_action(request, '上传视频', relative_path, f'数据库插入失败: {e}')
             # 返回给客户端时附加签名
             client_ip = get_client_ip(request)
             results.append({'id': file_id, 'path': f"{relative_path}?key={generate_media_key(relative_path, client_ip)}", 'thumbnail_path': (f"{thumbnail_path}?key={generate_media_key(thumbnail_path, client_ip)}" if thumbnail_path else '')})
