@@ -50,6 +50,9 @@
                 </div>
             </form>
             <div class="progress-bar" id="progressBar"><div class="bar" id="uploadProgress"></div></div>
+            {% if message %}
+                <div id="message" style="margin-top:16px;color:#b91c1c;font-weight:700;">{{ message }}</div>
+            {% endif %}
             <div id="status">请选择照片后点击上传。</div>
             <div class="preview" id="preview"></div>
         </div>

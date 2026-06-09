@@ -38,6 +38,18 @@ AUTH_FAILURES_LOCK = threading.Lock()
 GUEST_FACE_LIMIT_LOCK = threading.Lock()
 
 
+def login_verification_enabled() -> bool:
+    return getattr(settings, 'ENABLE_LOGIN_VERIFICATION', True)
+
+
+def upload_enabled() -> bool:
+    return getattr(settings, 'ENABLE_UPLOAD', True)
+
+
+def guest_face_block_threshold() -> int:
+    return getattr(settings, 'GUEST_FACE_BLOCK_THRESHOLD', 2)
+
+
 def get_guest_face_limit_file_path():
     temp_dir = os.path.join(settings.BASE_DIR, 'temp')
     os.makedirs(temp_dir, exist_ok=True)
@@ -90,7 +102,7 @@ def save_guest_face_limit_data(data):
 
 
 def is_guest_face_ip_blocked(ip: str) -> bool:
-    if not ip:
+    if not login_verification_enabled() or not ip:
         return False
     data = load_guest_face_limit_data()
     record = data.get(ip)
@@ -109,7 +121,7 @@ def is_guest_face_ip_blocked(ip: str) -> bool:
 
 
 def increment_guest_face_attempt(ip: str):
-    if not ip:
+    if not login_verification_enabled() or not ip:
         return None
     with GUEST_FACE_LIMIT_LOCK:
         data = load_guest_face_limit_data()
@@ -146,7 +158,7 @@ def increment_guest_face_attempt(ip: str):
 
         record['count'] = record.get('count', 0) + 1
         record['date'] = today
-        if record['count'] > 2:
+        if record['count'] > guest_face_block_threshold():
             record['blocked_at'] = get_current_timestamp()
         data[ip] = record
         save_guest_face_limit_data(data)
@@ -197,6 +209,8 @@ def verify_media_key(key: str, media_path: str, client_ip: str = '') -> bool:
 
 def media_requires_login(path: str) -> bool:
     """视频原文件访问需要登录，缩略图不需要。"""
+    if not login_verification_enabled():
+        return False
     normalized = path.replace('\\', '/').lstrip('/')
     return normalized.startswith('vdo/') and not normalized.startswith('vdo/thumbnails/')
 
@@ -538,6 +552,8 @@ def mdb_search_files(query):
 def mdb_login_required(view_func):
     @wraps(view_func)
     def _wrapped(request, *args, **kwargs):
+        if not login_verification_enabled():
+            return view_func(request, *args, **kwargs)
         if request.session.get('username'):
             return view_func(request, *args, **kwargs)
         return redirect('/login/')
@@ -715,7 +731,7 @@ def recognize_face(request):
         log_action(request, '人脸识别', '', '非法请求方法')
         return JsonResponse({'status': 'error', 'message': '仅支持POST请求。'})
 
-    if not request.session.get('username'):
+    if login_verification_enabled() and not request.session.get('username'):
         client_ip = get_client_ip(request)
         if is_guest_face_ip_blocked(client_ip):
             log_action(request, '人脸识别', '', '访客 IP 达到限制')
@@ -757,8 +773,15 @@ def recognize_face(request):
             os.remove(temp_path)
 
 
-@mdb_login_required
 def photo_upload(request):
+    if not request.session.get('username'):
+        return redirect(f"/login/?next={request.path}")
+    if not upload_enabled():
+        message = '没有开启上传权限哦~'
+        if request.method == 'POST':
+            return JsonResponse({'status': 'error', 'message': message})
+        return render(request, 'photo_upload.html', {'message': message})
+
     if request.method == 'POST':
         upload_files = request.FILES.getlist('photos')
         if not upload_files:
@@ -835,7 +858,7 @@ def video_gallery(request):
 
 
 def video_preview(request, file_id):
-    if not request.session.get('username'):
+    if login_verification_enabled() and not request.session.get('username'):
         log_action(request, '视频预览', file_id, '未登录尝试访问预览')
         return redirect(f"/login/?next={request.path}")
 
@@ -869,7 +892,7 @@ def video_preview(request, file_id):
 
 
 def watch_video(request, file_id):
-    if not request.session.get('username'):
+    if login_verification_enabled() and not request.session.get('username'):
         log_action(request, '观看视频', '', '未登录尝试访问')
         return redirect(f"/login/?next={request.path}")
 
@@ -965,8 +988,15 @@ def delete_files(request):
     return render(request, 'delete.html', context)
 
 
-@mdb_login_required
 def upload_video(request):
+    if not request.session.get('username'):
+        return redirect(f"/login/?next={request.path}")
+    if not upload_enabled():
+        message = '没有开启上传权限哦~'
+        if request.method == 'POST':
+            return JsonResponse({'status': 'error', 'message': message})
+        return render(request, 'video_upload.html', {'message': message})
+
     if request.method == 'POST':
         video_files = request.FILES.getlist('videos')
         if not video_files:
@@ -1051,6 +1081,9 @@ def search_files(request):
 
 @csrf_exempt
 def upload_chunk(request):
+    if not upload_enabled():
+        return JsonResponse({'status': 'error', 'message': '没有开启上传权限哦~'})
+
     if request.method != 'POST':
         return JsonResponse({'status': 'error', 'message': '仅支持POST'})
 
@@ -1076,6 +1109,9 @@ def upload_chunk(request):
 
 @csrf_exempt
 def merge_chunks(request):
+    if not upload_enabled():
+        return JsonResponse({'status': 'error', 'message': '没有开启上传权限哦~'})
+
     if request.method != 'POST':
         return JsonResponse({'status': 'error', 'message': '仅支持POST'})
 
